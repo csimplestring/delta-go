@@ -16,7 +16,7 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.7.5
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6
-	github.com/xhit/go-str2duration/v2 v2.0.0
+	github.com/xhit/go-str2duration/v2 v2.1.0
 )
 
 require (
