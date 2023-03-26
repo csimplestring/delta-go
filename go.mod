@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/barweiss/go-tuple v1.0.2
-	github.com/deckarep/golang-set/v2 v2.1.0
+	github.com/deckarep/golang-set/v2 v2.3.0
 	github.com/fraugster/parquet-go v0.12.0
 	github.com/google/uuid v1.3.0
 	github.com/mitchellh/hashstructure/v2 v2.0.2
