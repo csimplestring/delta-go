@@ -1,7 +1,12 @@
-version: '3.7'
+version: '3'
 
 services:
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
+  azure:
+    build:
+      context: ./
+      dockerfile: Dockerfile.azure
+      args:
+        AZURITE_VERSION: 3.17.0
+    restart: on-failure
     ports:
       - 10000:10000
