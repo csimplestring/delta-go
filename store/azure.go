@@ -6,8 +6,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	deltaErrors "github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
@@ -110,7 +114,22 @@ func (a *AzureStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 // implementation must ensure that the entire file is made visible atomically, that is,
 // it should not generate partial files.
 func (a *AzureStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
-	panic("not implemented") // TODO: Implement
+	blobName := a.LogPath + path
+
+	var opt *blockblob.UploadStreamOptions
+	appendNewline := true
+
+	if !overwrite {
+		opt = &blockblob.UploadStreamOptions{
+			AccessConditions: &blob.AccessConditions{
+				ModifiedAccessConditions: &blob.ModifiedAccessConditions{IfNoneMatch: to.Ptr(azcore.ETagAny)},
+			},
+		}
+	}
+
+	_, err := a.azClient.UploadStream(context.Background(), a.azContainer, blobName, iter.AsReadCloser(actions, appendNewline), opt)
+
+	return err
 }
 
 // Resolve the fully qualified path for the given `path`.
@@ -123,5 +142,5 @@ func (a *AzureStore) ResolvePathOnPhysicalStore(path string) (string, error) {
 
 // Whether a partial write is visible for the underlying file system of `path`.
 func (a *AzureStore) IsPartialWriteVisible(path string) bool {
-	panic("not implemented") // TODO: Implement
+	return false
 }

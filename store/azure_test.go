@@ -112,3 +112,29 @@ func TestAzureStore_ListFrom(t *testing.T) {
 	assert.Equal(t, "checkpoint/_delta_log/00000000000000000013.json", slice[1].path)
 	assert.Equal(t, "checkpoint/_delta_log/00000000000000000014.json", slice[2].path)
 }
+
+func TestAzureStore_Write(t *testing.T) {
+	containerName := "golden"
+	connStr := "AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;DefaultEndpointsProtocol=http;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+	logPath := "checkpoint/_delta_log/"
+
+	os.Setenv("AZURE_CONNECTION_STR", connStr)
+	os.Setenv("AZURE_CONTAINER", containerName)
+
+	s, err := newAzureStore(logPath)
+	assert.NoError(t, err)
+
+	data := []string{
+		"a\n",
+		"bbbbbbbbbbbbbbbbb\n",
+	}
+	actions := iter.FromSlice(data)
+	err = s.Write("test.json", actions, false)
+	assert.NoError(t, err)
+
+	it, err := s.Read("test.json")
+	assert.NoError(t, err)
+	res, err := iter.ToSlice(it)
+	assert.NoError(t, err)
+	assert.Equal(t, res, data)
+}

@@ -76,7 +76,6 @@ func New(path string) (Store, error) {
 		p.Scheme = ""
 		v := p.String()
 		return &LocalStore{
-
 			LogPath: v,
 		}, nil
 	}
