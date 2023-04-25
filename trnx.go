@@ -472,7 +472,11 @@ func (trx *optimisticTransactionImp) prepareCommit(actions []action.Action) ([]a
 	}
 
 	if trx.snapshot.version == -1 {
-		if !trx.fs.Exists(trx.logPath) {
+		exist, err := trx.fs.Exists(trx.logPath)
+		if err != nil {
+			return nil, err
+		}
+		if !exist {
 			if err := trx.fs.Mkdirs(trx.logPath); err != nil {
 				return nil, err
 			}

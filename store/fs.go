@@ -12,7 +12,7 @@ import (
 var _ FS = &LocalFS{}
 
 type FS interface {
-	Exists(path string) bool
+	Exists(path string) (bool, error)
 	Mkdirs(path string) error
 	Create(path string, overwrite bool) error
 }
@@ -25,16 +25,20 @@ func (l *LocalFS) Mkdirs(path string) error {
 	return os.Mkdir(path, os.ModePerm)
 }
 
-func (l *LocalFS) Exists(path string) bool {
+func (l *LocalFS) Exists(path string) (bool, error) {
 	path = strings.TrimPrefix(path, "file://")
 	_, err := os.Stat(path)
-	return err == nil
+	return err == nil, nil
 }
 
 func (l *LocalFS) Create(path string, overwrite bool) error {
 	path = strings.TrimPrefix(path, "file://")
 
-	if !l.Exists(path) {
+	exist, err := l.Exists(path)
+	if err != nil {
+		return err
+	}
+	if !exist {
 		f, err := os.Create(path)
 		if err != nil {
 			return eris.Wrap(err, "local filesystem creation "+path)
