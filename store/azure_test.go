@@ -94,3 +94,16 @@ func TestAzureStore_Write(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, res, data)
 }
+
+func TestAzureFS(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test.")
+	}
+
+	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
+	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
+
+	fs := &AzureBlobFS{}
+	err := fs.Mkdirs("azblob://golden?localemu=true")
+	assert.NoError(t, err)
+}

@@ -23,7 +23,6 @@ type LocalStore struct {
 func (l *LocalStore) Root() string { return l.LogPath }
 
 func (l *LocalStore) ResolvePathOnPhysicalStore(path string) (string, error) {
-
 	p, err := url.Parse(path)
 	if err != nil {
 		return "", err

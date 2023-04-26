@@ -1,12 +1,16 @@
 package store
 
 import (
+	"context"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/rotisserie/eris"
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/azureblob"
+	_ "gocloud.dev/blob/fileblob"
 )
 
 var _ FS = &LocalFS{}
@@ -21,8 +25,10 @@ type LocalFS struct {
 }
 
 func (l *LocalFS) Mkdirs(path string) error {
-	path = strings.TrimPrefix(path, "file://")
-	return os.Mkdir(path, os.ModePerm)
+	path = strings.TrimSuffix(path, "/") + "/"
+
+	_, err := blob.OpenBucket(context.Background(), path+"?create_dir=true")
+	return err
 }
 
 func (l *LocalFS) Exists(path string) (bool, error) {
@@ -71,4 +77,29 @@ func GetFileSystem(path string) (FS, error) {
 	}
 
 	return nil, errno.UnsupportedFileSystem("msg string")
+}
+
+type AzureBlobFS struct {
+}
+
+func (a *AzureBlobFS) Exists(path string) (bool, error) {
+	panic("not implemented") // TODO: Implement
+}
+
+func (a *AzureBlobFS) Mkdirs(path string) error {
+	bucket, err := blob.OpenBucket(context.Background(), path)
+	if err != nil {
+		return err
+	}
+	defer bucket.Close()
+
+	path = strings.TrimPrefix(path, "azblob://")
+	path = strings.TrimSuffix(path, "/") + "/"
+
+	return bucket.WriteAll(context.Background(), path, nil, nil)
+
+}
+
+func (a *AzureBlobFS) Create(path string, overwrite bool) error {
+	panic("not implemented") // TODO: Implement
 }
