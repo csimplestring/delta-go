@@ -3,6 +3,7 @@ package deltago
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -100,6 +101,30 @@ type logReplayIterator struct {
 	checkpointReader checkpointReader
 	reverseFilesIter iter.Iter[string]
 	actionIter       mo.Option[iter.Iter[*replayTuple]]
+}
+
+func (l *logReplayIterator) NextV2() (*replayTuple, error) {
+	if l.actionIter.IsAbsent() {
+		it, err := l.getNextIter()
+		if err != nil {
+			return nil, err
+		}
+		l.actionIter = mo.Some(it)
+	}
+
+	// r, err := l.actionIter.MustGet().Next()
+	r, err := l.actionIter.MustGet().Value()
+	if err != nil {
+		if err == io.EOF {
+			// reach end of file
+			l.actionIter = mo.None[iter.Iter[*replayTuple]]()
+			return l.NextV2()
+		} else {
+			return nil, err
+		}
+	}
+
+	return r, nil
 }
 
 func (l *logReplayIterator) getNextIter() (iter.Iter[*replayTuple], error) {
