@@ -183,19 +183,8 @@ func (b *baseStore) Read(path string) (iter.Iter[string], error) {
 
 func (b *baseStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 
-	// startPos := lookupPrefixPos(path, prefilledListingPrefixes)
-	// if startPos == -1 {
-	// 	return nil, eris.Wrap(errno.ErrFileNotFound, "cannot listing files starting with "+path)
-	// }
+	return newListingIter(b.logDir, path, b.bucket)
 
-	// yielder := &listingPrefixYielder{
-	// 	startPos: startPos,
-	// 	prefixes: prefilledListingPrefixes,
-	// }
-
-	// objects, token, err := b.bucket.ListPage(context.Background(), blob.FirstPageToken, 50, nil)
-
-	return nil, nil
 }
 
 type listingIter struct {
@@ -206,47 +195,89 @@ type listingIter struct {
 	// list objects
 	bucket          *blob.Bucket
 	blobListingIter *blob.ListIterator
-
-	// flag to re-fetch the objects
-
+	buf             []*blob.ListObject
+	reloadErr       error
 }
 
-// func newListingIter(logDir string, path string, bucket *blob.Bucket) (*listingIter, error) {
-// 	startPos := lookupPrefixPos(path, prefilledListingPrefixes)
-// 	if startPos == -1 {
-// 		return nil, eris.Wrap(errno.ErrFileNotFound, "cannot listing files starting with "+path)
-// 	}
-// 	yielder := &listingPrefixYielder{
-// 		startPos: startPos,
-// 		prefixes: prefilledListingPrefixes,
-// 	}
+func newListingIter(logDir string, path string, bucket *blob.Bucket) (*listingIter, error) {
+	startPos := lookupPrefixPos(path, prefilledListingPrefixes)
+	if startPos == -1 {
+		return nil, eris.Wrap(errno.ErrFileNotFound, "cannot listing files starting with "+path)
+	}
+	yielder := &listingPrefixYielder{
+		startPos: startPos,
+		prefixes: prefilledListingPrefixes,
+	}
 
-// 	prefix, end := yielder.Next()
-// 	if end {
-// 		return nil, eris.Wrap(errno.ErrIllegalArgument, "cannot generate prefix for "+path)
-// 	}
+	prefix, err := yielder.Next()
+	if err != nil {
+		return nil, eris.Wrap(errno.ErrIllegalArgument, "cannot generate prefix for "+path)
+	}
 
-// 	return &listingIter{
-// 		logDir:          logDir,
-// 		prefixYielder:   yielder,
-// 		prefix:          prefix,
-// 		bucket:          bucket,
-// 		blobListingIter: bucket.List(&blob.ListOptions{Prefix: prefix}),
-// 	}, nil
-// }
+	return &listingIter{
+		logDir:          logDir,
+		prefixYielder:   yielder,
+		prefix:          prefix,
+		bucket:          bucket,
+		blobListingIter: bucket.List(&blob.ListOptions{Prefix: prefix}),
+	}, nil
+}
 
-func (l *listingIter) Next() (*FileMeta, error) {
-	// listObj, err := l.blobListingIter.Next(context.Background())
-	// if err != nil {
-	// 	if err == io.EOF {
-	// 		// reload
+var _ iter.Iter[*FileMeta] = &listingIter{}
 
-	// 	}
-	// 	return nil, err
-	// }
+func (l *listingIter) Next() bool {
+	v, err := l.blobListingIter.Next(context.Background())
 
-	// li
-	panic("not implemented") // TODO: Implement
+	if err == nil {
+		l.buf = append(l.buf, v)
+		return true
+	}
+
+	if err == io.EOF {
+		// need to reload prefix
+		prefix, err := l.prefixYielder.Next()
+		if err == io.EOF {
+			return false
+		}
+		// reload objects
+		l.blobListingIter = l.bucket.List(&blob.ListOptions{Prefix: prefix})
+		return l.Next()
+	}
+
+	l.reloadErr = err
+	return false
+}
+
+func (l *listingIter) Value() (*FileMeta, error) {
+	// check error from last Next()
+	if l.reloadErr != nil {
+		return nil, l.reloadErr
+	}
+
+	extractFileMeta := func(v *blob.ListObject) *FileMeta {
+		return &FileMeta{
+			path:         v.Key,
+			size:         uint64(v.Size),
+			timeModified: v.ModTime,
+		}
+	}
+
+	// check buffer
+	var v *blob.ListObject
+	if len(l.buf) != 0 {
+		v, l.buf = l.buf[0], l.buf[1:]
+		return extractFileMeta(v), nil
+	}
+	// no elements in buffer
+	v, err := l.blobListingIter.Next(context.Background())
+	if err == nil {
+		return extractFileMeta(v), nil
+	}
+	if err == io.EOF {
+		return nil, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (l *listingIter) Close() error {

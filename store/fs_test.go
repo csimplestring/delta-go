@@ -23,6 +23,12 @@ func Test_newLocalStore(t *testing.T) {
 	for i.Next() {
 		fmt.Println(i.Value())
 	}
+
+	iter, err := s.ListFrom("00000000000000000011.json")
+	assert.NoError(t, err)
+	for iter.Next() {
+		fmt.Println(iter.Value())
+	}
 }
 
 func Test_newAzureBlobStore(t *testing.T) {
