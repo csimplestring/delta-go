@@ -2,10 +2,11 @@ package deltago
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/internal/util/path"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 )
 
 type InMemoryLogReplay struct {
@@ -66,12 +67,12 @@ func (r *InMemoryLogReplay) Append(version int64, iter iter.Iter[action.Action])
 	r.currentVersion = version
 
 	for {
-		ok := iter.Next()
-		if !ok {
+		a, err := iter.Next()
+
+		if err == io.EOF {
 			break
 		}
 
-		a, err := iter.Value()
 		if err != nil {
 			return err
 		}
