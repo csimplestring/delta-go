@@ -1,4 +1,4 @@
-package iter_v2
+package iter
 
 import (
 	"fmt"

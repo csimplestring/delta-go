@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	"github.com/stretchr/testify/assert"
 	_ "gocloud.dev/blob/azureblob"
 	_ "gocloud.dev/blob/fileblob"
@@ -26,10 +26,10 @@ func Test_newLocalStore(t *testing.T) {
 		fmt.Println(line)
 	}
 
-	iter, err := s.ListFrom("00000000000000000007.json")
+	it, err := s.ListFrom("00000000000000000007.json")
 	assert.NoError(t, err)
 
-	files, err := iter_v2.Map(iter, func(f *FileMeta) (string, error) {
+	files, err := iter.Map(it, func(f *FileMeta) (string, error) {
 		return f.path, nil
 	})
 	assert.NoError(t, err)
@@ -63,11 +63,11 @@ func Test_newAzureBlobStore(t *testing.T) {
 		fmt.Println(v)
 	}
 
-	iter, err := s.ListFrom("00000000000000000007.json")
+	it, err := s.ListFrom("00000000000000000007.json")
 	assert.NoError(t, err)
-	defer iter.Close()
+	defer it.Close()
 
-	files, err := iter_v2.Map(iter, func(f *FileMeta) (string, error) {
+	files, err := iter.Map(it, func(f *FileMeta) (string, error) {
 		return f.path, nil
 	})
 	assert.NoError(t, err)

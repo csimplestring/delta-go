@@ -6,7 +6,7 @@ import (
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/internal/util"
-	iter "github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	"github.com/repeale/fp-go"
 	"github.com/stretchr/testify/assert"
 )

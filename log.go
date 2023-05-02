@@ -8,7 +8,7 @@ import (
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	iter "github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	"github.com/csimplestring/delta-go/store"
 	"github.com/rotisserie/eris"
 )

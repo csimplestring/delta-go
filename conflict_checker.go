@@ -6,7 +6,7 @@ import (
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
 	"github.com/csimplestring/delta-go/isolation"
-	iter "github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	"github.com/csimplestring/delta-go/store"
 	"github.com/csimplestring/delta-go/types"
 	mapset "github.com/deckarep/golang-set/v2"

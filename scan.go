@@ -6,7 +6,7 @@ import (
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/path"
-	iter "github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	expr "github.com/csimplestring/delta-go/types"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/rotisserie/eris"

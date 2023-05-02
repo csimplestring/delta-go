@@ -1,4 +1,4 @@
-package iter_v2
+package iter
 
 type MapIter[T any, R any] struct {
 	It     Iter[T]

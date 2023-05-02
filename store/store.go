@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/csimplestring/delta-go/errno"
-	iter "github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	"github.com/rotisserie/eris"
 )
 

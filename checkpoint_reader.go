@@ -6,7 +6,7 @@ import (
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
-	iter "github.com/csimplestring/delta-go/iter_v2"
+	"github.com/csimplestring/delta-go/iter"
 	goparquet "github.com/fraugster/parquet-go"
 	"github.com/fraugster/parquet-go/floor"
 	"github.com/rotisserie/eris"
