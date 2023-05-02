@@ -1,6 +1,7 @@
 package deltago
 
 import (
+	"io"
 	"os"
 	"sort"
 	"strconv"
@@ -8,7 +9,7 @@ import (
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	"github.com/csimplestring/delta-go/op"
 	"github.com/csimplestring/delta-go/types"
 	"github.com/repeale/fp-go"
@@ -264,14 +265,12 @@ func TestScan_correct_reverse_replay(t *testing.T) {
 	defer iter.Close()
 
 	var set []*action.AddFile
-	for iter.Next() {
-		iter.Next()
+	var v *action.AddFile
 
-		v, err := iter.Value()
-		assert.NoError(t, err)
-
+	for v, err = iter.Next(); err == nil; v, err = iter.Next() {
 		set = append(set, v)
 	}
+	assert.ErrorIs(t, err, io.EOF)
 
 	// sort then compare
 	sort.Slice(expectedSet, func(i, j int) bool {

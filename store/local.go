@@ -12,7 +12,7 @@ import (
 	"github.com/rotisserie/eris"
 
 	deltaErrors "github.com/csimplestring/delta-go/errno"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 )
 
 type LocalStore struct {
@@ -98,18 +98,20 @@ func (l *LocalStore) Write(path string, iter iter.Iter[string], overwrite bool) 
 		}
 	}
 
+	var err error
 	w, err := newAtomicWriter(path)
 	if err != nil {
 		return err
 	}
 
-	for iter.Next() {
-		line, err := iter.Value()
-		if err != nil {
-			return err
+	var line string
+	for line, err = iter.Next(); err == nil; line, err = iter.Next() {
+		if _, werr := w.Write([]byte(line + "\n")); werr != nil {
+			return werr
 		}
-
-		w.Write([]byte(line + "\n"))
+	}
+	if err != nil && err != io.EOF {
+		return err
 	}
 
 	return w.Close()

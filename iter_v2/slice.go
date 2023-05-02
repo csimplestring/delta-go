@@ -43,7 +43,7 @@ func ToSlice[T any](iter Iter[T]) ([]T, error) {
 	var s []T
 	var item T
 	var err error
-	for item, err = iter.Next(); err != nil; item, err = iter.Next() {
+	for item, err = iter.Next(); err == nil; item, err = iter.Next() {
 		s = append(s, item)
 	}
 	if err != nil && err != io.EOF {

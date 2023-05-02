@@ -11,20 +11,14 @@ var _ Iter[string] = &LineReader{}
 // FromReadCloser returns an iterator producing lines from the given reader.
 func FromReadCloser(r io.ReadCloser) *LineReader {
 	s := *bufio.NewScanner(r)
-	// advance the line
-	eof := s.Scan()
 
 	return &LineReader{
-		err:     s.Err(),
-		eof:     eof,
 		reader:  r,
 		scanner: s,
 	}
 }
 
 type LineReader struct {
-	err     error
-	eof     bool
 	reader  io.ReadCloser
 	scanner bufio.Scanner
 }
@@ -33,15 +27,13 @@ type LineReader struct {
 // reader.
 func (it *LineReader) Next() (string, error) {
 
-	s := it.scanner.Text()
-	eof := it.scanner.Scan()
-	err := it.scanner.Err()
-
-	if eof {
-		return "", io.EOF
+	if it.scanner.Scan() {
+		s := it.scanner.Text()
+		err := it.scanner.Err()
+		return s, err
 	}
 
-	return s, err
+	return "", io.EOF
 }
 
 func (it *LineReader) Close() error {

@@ -3,6 +3,7 @@ package deltago
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/csimplestring/delta-go/internal/util/filenames"
 	"github.com/csimplestring/delta-go/internal/util/path"
 	"github.com/csimplestring/delta-go/isolation"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	"github.com/csimplestring/delta-go/op"
 	"github.com/csimplestring/delta-go/store"
 	"github.com/csimplestring/delta-go/types"
@@ -147,18 +148,17 @@ func (trx *optimisticTransactionImp) Commit(actionsIter iter.Iter[action.Action]
 	defer actionsIter.Close()
 
 	var actions []action.Action
-	for actionsIter.Next() {
-		a, err := actionsIter.Value()
-		if err != nil {
-			return CommitResult{}, err
-		}
-
+	var err error
+	for a, err := actionsIter.Next(); err == nil; a, err = actionsIter.Next() {
 		switch v := a.(type) {
 		case *action.Metadata:
 			trx.UpdateMetadata(v)
 		default:
 			actions = append(actions, v)
 		}
+	}
+	if err != nil && err != io.EOF {
+		return CommitResult{}, err
 	}
 
 	preparedActions, err := trx.prepareCommit(actions)
@@ -250,14 +250,13 @@ func (trx *optimisticTransactionImp) MarkFilesAsRead(readPredicate types.Express
 		trx.readPredicates = append(trx.readPredicates, scan.PushedPredicate())
 	}
 
-	for matchedFiles.Next() {
-		f, err := matchedFiles.Value()
-		if err != nil {
-			return nil, err
-		} else {
-			trx.readFiles.Add(f)
-		}
+	for f, err := matchedFiles.Next(); err == nil; f, err = matchedFiles.Next() {
+		trx.readFiles.Add(f)
 	}
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
 	matchedFiles.Close()
 
 	return scan, nil

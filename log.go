@@ -1,13 +1,14 @@
 package deltago
 
 import (
+	"io"
 	"strings"
 	"sync"
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	"github.com/csimplestring/delta-go/store"
 	"github.com/rotisserie/eris"
 )
@@ -158,14 +159,13 @@ func (l *logImpl) Changes(startVersion int64, failOnDataLoss bool) (iter.Iter[Ve
 	defer fs.Close()
 
 	var deltaPaths []string
-	for fs.Next() {
-		f, err := fs.Value()
-		if err != nil {
-			return nil, err
-		}
+	for f, err := fs.Next(); err == nil; f, err = fs.Next() {
 		if filenames.IsDeltaFile(f.Path()) {
 			deltaPaths = append(deltaPaths, f.Path())
 		}
+	}
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
 	lastSeenVersion := startVersion - 1

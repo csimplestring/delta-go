@@ -1,11 +1,12 @@
 package deltago
 
 import (
+	"io"
 	"os"
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	goparquet "github.com/fraugster/parquet-go"
 	"github.com/fraugster/parquet-go/floor"
 	"github.com/rotisserie/eris"
@@ -59,14 +60,10 @@ type localParquetIterater struct {
 	cur     int64
 }
 
-func (p *localParquetIterater) Next() bool {
-	return p.cur < p.numRows
-}
-
-func (p *localParquetIterater) Value() (action.Action, error) {
+func (p *localParquetIterater) Next() (action.Action, error) {
 	am := &actionMarshaller{a: &action.SingleAction{}}
 	if !p.reader.Next() {
-		return nil, errno.IllegalStateError("EOF reached but this should not happen since Next() is idempotent")
+		return nil, io.EOF
 	}
 	err := p.reader.Scan(am)
 	if err != nil {

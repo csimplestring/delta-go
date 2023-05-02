@@ -1,7 +1,9 @@
 package iter_v2
 
 import (
+	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -28,4 +30,14 @@ func TestAsReader(t *testing.T) {
 		sb.Write(buf[:n])
 	}
 	assert.Equal(t, strings.Join(input, "\n")+"\n", sb.String())
+}
+
+func TestFromReadCloser(t *testing.T) {
+	f, err := os.Open("../tests/golden/snapshot-data0/_delta_log/00000000000000000000.json")
+	assert.NoError(t, err)
+
+	iter := FromReadCloser(f)
+	for line, err := iter.Next(); err == nil; line, err = iter.Next() {
+		fmt.Println(line)
+	}
 }

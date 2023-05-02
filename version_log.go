@@ -2,7 +2,7 @@ package deltago
 
 import (
 	"github.com/csimplestring/delta-go/action"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	"github.com/csimplestring/delta-go/store"
 )
 

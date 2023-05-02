@@ -53,6 +53,6 @@ func Test_prefix(t *testing.T) {
 	startPos := lookupPrefixPos(fmt.Sprintf("%020d.json", 623), prefixes)
 
 	for i := startPos; i < len(prefixes); i++ {
-		fmt.Println(prefixes[i])
+		//fmt.Println(prefixes[i])
 	}
 }

@@ -18,7 +18,7 @@ func Map[T any, R any](iter Iter[T], mapper func(t T) (R, error)) ([]R, error) {
 	var res []R
 	var err error
 	var item T
-	for item, err = iter.Next(); err != nil; item, err = iter.Next() {
+	for item, err = iter.Next(); err == nil; item, err = iter.Next() {
 
 		r, err := mapper(item)
 		if err != nil {

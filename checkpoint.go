@@ -2,6 +2,7 @@ package deltago
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"sort"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	"github.com/csimplestring/delta-go/store"
 	"github.com/rotisserie/eris"
 
@@ -107,12 +108,12 @@ func LoadMetadataFromFile(s store.Store) (mo.Option[*CheckpointMetaDataJSON], er
 			}
 		}
 
-		if !lines.Next() {
+		line, err := lines.Next()
+
+		if err == io.EOF {
 			log.Println("failed to read last checkpoint, end of iterator, try again")
 			continue
 		}
-
-		line, err := lines.Value()
 		if err != nil {
 			log.Println("failed to get line from iterator when reading last checkpoint, try again")
 			lines.Close()
@@ -163,10 +164,8 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 		}
 
 		var checkpoints []*CheckpointInstance
-		for f, err := iter.Value(); iter.Next(); f, err = iter.Value() {
-			if err != nil {
-				return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
-			}
+		for f, err := iter.Next(); err == nil; f, err = iter.Next() {
+
 			if !filenames.IsCheckpointFile(f.Path()) {
 				continue
 			}
@@ -176,6 +175,9 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 			} else {
 				break
 			}
+		}
+		if err != nil && err != io.EOF {
+			return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
 		}
 
 		lastCheckpoint := GetLatestCompleteCheckpointFromList(checkpoints, cv)

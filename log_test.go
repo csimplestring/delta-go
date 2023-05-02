@@ -2,6 +2,7 @@ package deltago
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,7 +16,7 @@ import (
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	"github.com/csimplestring/delta-go/iter"
+	iter "github.com/csimplestring/delta-go/iter_v2"
 	"github.com/csimplestring/delta-go/op"
 	"github.com/csimplestring/delta-go/store"
 	"github.com/csimplestring/delta-go/types"
@@ -192,11 +193,12 @@ func TestLog_checkpoint(t *testing.T) {
 	defer iter.Close()
 
 	var res []string
-	for iter.Next() {
-		f, err := iter.Value()
-		assert.NoError(t, err)
+	var iterErr error
+	var f *action.AddFile
+	for f, iterErr = iter.Next(); iterErr == nil; f, iterErr = iter.Next() {
 		res = append(res, f.Path)
 	}
+	assert.ErrorIs(t, iterErr, io.EOF)
 	iter.Close()
 	assert.Equal(t, "15", res[0])
 }
@@ -565,7 +567,8 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 	// non-existant start version
 	versionLogIter, err := log.Changes(3, false)
 	assert.NoError(t, err)
-	assert.False(t, versionLogIter.Next())
+	_, err = versionLogIter.Next()
+	assert.ErrorIs(t, err, io.EOF)
 
 	// negative start version
 	_, err = log.Changes(-1, false)
