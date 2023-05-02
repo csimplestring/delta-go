@@ -254,7 +254,7 @@ func (l *listingIter) Next() (*FileMeta, error) {
 }
 
 func (l *listingIter) Close() error {
-	panic("not implemented") // TODO: Implement
+	return nil
 }
 
 func lookupPrefixPos(s string, prefixes []string) int {

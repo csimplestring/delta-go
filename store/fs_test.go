@@ -58,9 +58,30 @@ func Test_newAzureBlobStore(t *testing.T) {
 
 	i, err := s.Read("00000000000000000014.json")
 	assert.NoError(t, err)
+	defer i.Close()
 	for v, err := i.Next(); err == nil; v, err = i.Next() {
 		fmt.Println(v)
 	}
+
+	iter, err := s.ListFrom("00000000000000000007.json")
+	assert.NoError(t, err)
+	defer iter.Close()
+
+	files, err := iter_v2.Map(iter, func(f *FileMeta) (string, error) {
+		return f.path, nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{
+		"00000000000000000007.json",
+		"00000000000000000008.json",
+		"00000000000000000009.json",
+		"00000000000000000010.checkpoint.parquet",
+		"00000000000000000010.json",
+		"00000000000000000011.json",
+		"00000000000000000012.json",
+		"00000000000000000013.json",
+		"00000000000000000014.json",
+	}, files)
 }
 
 func Test_prefix(t *testing.T) {
