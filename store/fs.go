@@ -8,8 +8,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	az "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	azblob "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
+
 	"github.com/rotisserie/eris"
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/azureblob"
@@ -162,12 +168,30 @@ func newAzureBlobStore(container string, logDir string, localemu bool) (*baseSto
 	return &baseStore{
 		logDir: logDir,
 		bucket: bucket,
+		beforeWriteFn: func(asFunc func(interface{}) bool) error {
+			var opt *az.UploadStreamOptions
+			if asFunc(&opt) {
+				opt.AccessConditions = &azblob.AccessConditions{
+					ModifiedAccessConditions: &azblob.ModifiedAccessConditions{IfNoneMatch: to.Ptr(azcore.ETagAny)},
+				}
+			}
+			return nil
+		},
+		writeErrorFn: func(err error, path string) error {
+			var azError *azcore.ResponseError
+			if bucket.ErrorAs(err, &azError) && bloberror.HasCode(azError, bloberror.BlobAlreadyExists) {
+				return errno.FileAlreadyExists(path)
+			}
+			return err
+		},
 	}, nil
 }
 
 type baseStore struct {
-	logDir string
-	bucket *blob.Bucket
+	logDir        string
+	bucket        *blob.Bucket
+	beforeWriteFn func(asFunc func(interface{}) bool) error
+	writeErrorFn  func(err error, path string) error
 }
 
 func (b *baseStore) Read(path string) (iter.Iter[string], error) {
@@ -184,7 +208,32 @@ func (b *baseStore) Read(path string) (iter.Iter[string], error) {
 func (b *baseStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 
 	return newListingIter(b.logDir, path, b.bucket)
+}
 
+func (b *baseStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
+	path = strings.TrimPrefix(path, b.logDir)
+	var writeOpt *blob.WriterOptions
+
+	if !overwrite {
+		writeOpt = &blob.WriterOptions{
+			BeforeWrite: b.beforeWriteFn,
+		}
+	}
+
+	w, err := b.bucket.NewWriter(context.Background(), path, writeOpt)
+	if err != nil {
+		return err
+	}
+
+	if _, err = w.ReadFrom(iter.AsReadCloser(actions, true)); err != nil {
+		return err
+	}
+
+	if err := w.Close(); err != nil {
+		return b.writeErrorFn(err, path)
+	}
+
+	return actions.Close()
 }
 
 type listingIter struct {

@@ -44,6 +44,9 @@ func Test_newLocalStore(t *testing.T) {
 		"00000000000000000013.json",
 		"00000000000000000014.json",
 	}, files)
+
+	err = s.Write("test.json", iter.FromSlice([]string{"a", "b", "c", "d", "e", "f", "g"}), false)
+	assert.NoError(t, err)
 }
 
 func Test_newAzureBlobStore(t *testing.T) {
@@ -82,6 +85,10 @@ func Test_newAzureBlobStore(t *testing.T) {
 		"00000000000000000013.json",
 		"00000000000000000014.json",
 	}, files)
+
+	err = s.Write("test-1.json", iter.FromSlice([]string{"b", "c", "d", "e", "f"}), false)
+	assert.NoError(t, err)
+
 }
 
 func Test_prefix(t *testing.T) {
