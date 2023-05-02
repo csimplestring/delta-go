@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/csimplestring/delta-go/iter_v2"
 	"github.com/stretchr/testify/assert"
 	_ "gocloud.dev/blob/azureblob"
 	_ "gocloud.dev/blob/fileblob"
@@ -20,15 +21,29 @@ func Test_newLocalStore(t *testing.T) {
 
 	i, err := s.Read("00000000000000000014.json")
 	assert.NoError(t, err)
-	for i.Next() {
-		fmt.Println(i.Value())
+
+	for line, err := i.Next(); err == nil; line, err = i.Next() {
+		fmt.Println(line)
 	}
 
-	iter, err := s.ListFrom("00000000000000000011.json")
+	iter, err := s.ListFrom("00000000000000000007.json")
 	assert.NoError(t, err)
-	for iter.Next() {
-		fmt.Println(iter.Value())
-	}
+
+	files, err := iter_v2.Map(iter, func(f *FileMeta) (string, error) {
+		return f.path, nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{
+		"00000000000000000007.json",
+		"00000000000000000008.json",
+		"00000000000000000009.json",
+		"00000000000000000010.checkpoint.parquet",
+		"00000000000000000010.json",
+		"00000000000000000011.json",
+		"00000000000000000012.json",
+		"00000000000000000013.json",
+		"00000000000000000014.json",
+	}, files)
 }
 
 func Test_newAzureBlobStore(t *testing.T) {
@@ -43,8 +58,8 @@ func Test_newAzureBlobStore(t *testing.T) {
 
 	i, err := s.Read("00000000000000000014.json")
 	assert.NoError(t, err)
-	for i.Next() {
-		fmt.Println(i.Value())
+	for v, err := i.Next(); err == nil; v, err = i.Next() {
+		fmt.Println(v)
 	}
 }
 
