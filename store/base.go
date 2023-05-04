@@ -101,7 +101,9 @@ type listingIter struct {
 }
 
 func newListingIter(logDir string, startPath string, bucket *blob.Bucket) (*listingIter, error) {
-	startPos := lookupPrefixPos(startPath, prefilledListingPrefixes)
+	version := strings.Split(startPath, ".")[0]
+
+	startPos := lookupPrefixPos(version, prefilledListingPrefixes)
 	if startPos == -1 {
 		return nil, eris.Wrap(errno.ErrFileNotFound, "cannot listing files starting with "+startPath)
 	}

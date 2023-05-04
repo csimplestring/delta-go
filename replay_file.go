@@ -106,13 +106,16 @@ func (l *logReplayIterator) Next() (*replayTuple, error) {
 
 	r, err := l.actionIter.MustGet().Next()
 	if err != nil {
-		if err == io.EOF {
-			// reach end of file
-			l.actionIter = mo.None[iter.Iter[*replayTuple]]()
-			return l.Next()
-		} else {
+		if err != io.EOF {
 			return nil, err
 		}
+		// reach end of file, close
+		if err := l.actionIter.MustGet().Close(); err != nil {
+			return nil, err
+		}
+		// continue to call next file
+		l.actionIter = mo.None[iter.Iter[*replayTuple]]()
+		return l.Next()
 	}
 
 	return r, nil

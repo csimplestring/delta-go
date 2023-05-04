@@ -107,6 +107,7 @@ func LoadMetadataFromFile(s store.Store) (mo.Option[*CheckpointMetaDataJSON], er
 				continue
 			}
 		}
+		defer lines.Close()
 
 		line, err := lines.Next()
 
@@ -116,7 +117,6 @@ func LoadMetadataFromFile(s store.Store) (mo.Option[*CheckpointMetaDataJSON], er
 		}
 		if err != nil {
 			log.Println("failed to get line from iterator when reading last checkpoint, try again")
-			lines.Close()
 			continue
 		}
 
@@ -162,6 +162,7 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 		if err != nil {
 			return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
 		}
+		defer iter.Close()
 
 		var checkpoints []*CheckpointInstance
 		for f, err := iter.Next(); err == nil; f, err = iter.Next() {

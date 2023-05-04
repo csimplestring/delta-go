@@ -75,8 +75,14 @@ func New(path string) (Store, error) {
 	if p.Scheme == "file" {
 		p.Scheme = ""
 		v := p.String()
+		localStore, err := newLocalStore(v)
+		if err != nil {
+			return nil, err
+		}
+
 		return &LocalStore{
 			LogPath: v,
+			s:       localStore,
 		}, nil
 	}
 

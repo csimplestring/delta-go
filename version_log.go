@@ -59,6 +59,7 @@ func (m *MemOptimizedVersionLog) ActionIter() (iter.Iter[action.Action], error) 
 	if err != nil {
 		return nil, err
 	}
+	defer i.Close()
 
 	mapIter := &iter.MapIter[string, action.Action]{
 		It: i,
