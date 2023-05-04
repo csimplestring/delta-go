@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -10,10 +12,24 @@ import (
 
 	linq "github.com/ahmetb/go-linq/v3"
 	"github.com/rotisserie/eris"
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/fileblob"
 
 	deltaErrors "github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
 )
+
+func newLocalStore(logDir string) (*baseStore, error) {
+	url := fmt.Sprintf("file://%s?create_dir=true", logDir)
+	bucket, err := blob.OpenBucket(context.Background(), url)
+	if err != nil {
+		return nil, err
+	}
+	return &baseStore{
+		logDir: logDir,
+		bucket: bucket,
+	}, nil
+}
 
 type LocalStore struct {
 	LogPath string

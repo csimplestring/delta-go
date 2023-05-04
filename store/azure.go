@@ -1,5 +1,20 @@
 package store
 
+import (
+	"context"
+	"fmt"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/csimplestring/delta-go/errno"
+
+	goblob "gocloud.dev/blob"
+	_ "gocloud.dev/blob/azureblob"
+)
+
 // import (
 // 	"context"
 // 	"os"
@@ -144,3 +159,37 @@ package store
 // func (a *AzureStore) IsPartialWriteVisible(path string) bool {
 // 	return false
 // }
+
+func newAzureBlobStore(container string, logDir string, localemu bool) (*baseStore, error) {
+	var url string
+	if localemu {
+		url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", container, logDir)
+	} else {
+		url = fmt.Sprintf("azblob://%s?prefix=%s", container, logDir)
+	}
+
+	bucket, err := goblob.OpenBucket(context.Background(), url)
+	if err != nil {
+		return nil, err
+	}
+	return &baseStore{
+		logDir: logDir,
+		bucket: bucket,
+		beforeWriteFn: func(asFunc func(interface{}) bool) error {
+			var opt *azblob.UploadStreamOptions
+			if asFunc(&opt) {
+				opt.AccessConditions = &azblob.AccessConditions{
+					ModifiedAccessConditions: &blob.ModifiedAccessConditions{IfNoneMatch: to.Ptr(azcore.ETagAny)},
+				}
+			}
+			return nil
+		},
+		writeErrorFn: func(err error, path string) error {
+			var azError *azcore.ResponseError
+			if bucket.ErrorAs(err, &azError) && bloberror.HasCode(azError, bloberror.BlobAlreadyExists) {
+				return errno.FileAlreadyExists(path)
+			}
+			return err
+		},
+	}, nil
+}
