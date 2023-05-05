@@ -55,6 +55,8 @@ type Log interface {
 // ForTable Create a DeltaLog instance representing the table located at the provided path.
 func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 	logPath := strings.TrimRight(dataPath, "/") + "/_delta_log/"
+	config.StorageConfig.LogDir = logPath
+
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
 	var fs store.FS

@@ -123,4 +123,5 @@ const (
 type StorageConfig struct {
 	Scheme StorageScheme
 	//DataPath string
+	LogDir string
 }

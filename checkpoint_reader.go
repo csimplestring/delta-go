@@ -1,15 +1,17 @@
 package deltago
 
 import (
-	"io"
-	"os"
+	"context"
+	"fmt"
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
 	goparquet "github.com/fraugster/parquet-go"
-	"github.com/fraugster/parquet-go/floor"
+	"github.com/fraugster/parquet-go/floor/interfaces"
 	"github.com/rotisserie/eris"
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/fileblob"
 )
 
 type checkpointReader interface {
@@ -18,7 +20,15 @@ type checkpointReader interface {
 
 func newCheckpointReader(config Config) (checkpointReader, error) {
 	if config.StorageConfig.Scheme == Local {
-		return &localCheckpointReader{}, nil
+		url := fmt.Sprintf("file://%s?create_dir=true", config.StorageConfig.LogDir)
+		bucket, err := blob.OpenBucket(context.Background(), url)
+		if err != nil {
+			return nil, err
+		}
+
+		return &localCheckpointReader{
+			bucket: bucket,
+		}, nil
 	}
 
 	return nil, eris.Wrap(errno.ErrIllegalArgument, "unsupported storage scheme "+string(config.StorageConfig.Scheme))
@@ -26,55 +36,50 @@ func newCheckpointReader(config Config) (checkpointReader, error) {
 
 // LocalCheckpointReader implements checkpoint reader
 type localCheckpointReader struct {
+	bucket *blob.Bucket
 }
 
 func (l *localCheckpointReader) Read(path string) (iter.Iter[action.Action], error) {
 
-	r, err := floor.NewFileReader(path)
+	r, err := l.bucket.NewReader(context.Background(), path, nil)
 	if err != nil {
 		return nil, eris.Wrap(err, "")
 	}
 
-	f, err := os.Open(path)
+	fr, err := goparquet.NewFileReader(r)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-
-	fr, err := goparquet.NewFileReader(f)
-	if err != nil {
-		return nil, err
-	}
-	numRows := fr.NumRows()
 
 	return &localParquetIterater{
-		reader:  r,
-		numRows: numRows,
-		cur:     0,
+		br:     r,
+		reader: fr,
 	}, nil
 }
 
 type localParquetIterater struct {
-	reader  *floor.Reader
-	numRows int64
-	cur     int64
+	br     *blob.Reader
+	reader *goparquet.FileReader
 }
 
 func (p *localParquetIterater) Next() (action.Action, error) {
-	am := &actionMarshaller{a: &action.SingleAction{}}
-	if !p.reader.Next() {
-		return nil, io.EOF
-	}
-	err := p.reader.Scan(am)
+	data, err := p.reader.NextRow()
 	if err != nil {
+		return nil, err
+	}
+
+	obj := interfaces.NewUnmarshallObject(data)
+
+	am := &actionMarshaller{a: &action.SingleAction{}}
+	if err := am.UnmarshalParquet(obj); err != nil {
 		return nil, eris.Wrap(err, "failed to read value")
 	}
-	p.cur++
+
 	return am.a.Unwrap(), nil
 }
 
 func (p *localParquetIterater) Close() error {
-	return p.reader.Close()
+	return p.br.Close()
 }
 
 // SchemaDefinition
