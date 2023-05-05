@@ -186,7 +186,8 @@ func (s *snapshotImp) loadTableProtoclAndMetadata() (*tuple.T2[*action.Protocol,
 	defer iter.Close()
 
 	var err error
-	for replayTuple, err := iter.Next(); err == nil; replayTuple, err = iter.Next() {
+	var replayTuple *replayTuple
+	for replayTuple, err = iter.Next(); err == nil; replayTuple, err = iter.Next() {
 		a := replayTuple.act
 		switch v := a.(type) {
 		case *action.Protocol:
