@@ -104,7 +104,7 @@ func TestLog_time_travel_versionAsOf(t *testing.T) {
 	err = os.Remove(f)
 	assert.NoError(t, err)
 	_, err = log.SnapshotForVersionAsOf(0)
-	assert.ErrorIs(t, err, errno.NoReproducibleHistoryFound(destTableDir+"/_delta_log/"))
+	assert.ErrorIs(t, err, errno.NoReproducibleHistoryFound(""))
 
 }
 
