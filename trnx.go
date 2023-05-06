@@ -586,7 +586,7 @@ func (trx *optimisticTransactionImp) doCommit(attemptVersion int64, actions []ac
 		return 0, err
 	}
 
-	if err := trx.logStore.Write(filenames.DeltaFile(trx.logPath, attemptVersion),
+	if err := trx.logStore.Write(filenames.DeltaFile(trx.logStore.Root(), attemptVersion),
 		iter.FromSlice(actionStrings), false); err != nil {
 		return 0, err
 	}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/rotisserie/eris"
@@ -38,70 +40,36 @@ func (l *LocalStore) Root() string {
 }
 
 func (l *LocalStore) ResolvePathOnPhysicalStore(path string) (string, error) {
-	// p, err := url.Parse(path)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// // path is like "file:///a/b/c"
-	// if len(p.Scheme) > 0 {
-	// 	// remove "file://"
-	// 	p.Scheme = ""
-	// 	return p.String(), nil
-	// }
-	// // path is like "/a/b/c
-	// if filepath.IsAbs(path) {
-	// 	return path, nil
-	// }
+	path = strings.TrimPrefix(path, "file://")
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
 
-	// return filepath.Join(l.LogPath, path), nil
-	return path, nil
+	// relative path
+	if dir == "." {
+		return base, nil
+	}
+
+	if strings.TrimSuffix(l.LogPath, "/") != strings.TrimSuffix(dir, "/") {
+		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", l.LogPath, dir)
+	}
+	return base, nil
 }
 
 func (l *LocalStore) Read(path string) (iter.Iter[string], error) {
-	path, _ = l.ResolvePathOnPhysicalStore(path)
-
-	// file, err := os.Open(path)
-	// if err != nil {
-	// 	if os.IsNotExist(err) {
-	// 		return nil, deltaErrors.FileNotFound(path)
-	// 	}
-	// 	return nil, eris.Wrap(err, "local store read "+path)
-	// }
-
-	// return iter.FromReadCloser(file), nil
+	path, err := l.ResolvePathOnPhysicalStore(path)
+	if err != nil {
+		return nil, err
+	}
 
 	return l.s.Read(path)
 }
 
 func (l *LocalStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
-	// path, _ = l.ResolvePathOnPhysicalStore(path)
+	path, err := l.ResolvePathOnPhysicalStore(path)
+	if err != nil {
+		return nil, err
+	}
 
-	// parent, startFile := filepath.Split(path)
-	// stats, err := os.ReadDir(parent)
-	// if err != nil {
-	// 	if os.IsNotExist(err) {
-	// 		return nil, deltaErrors.FileNotFound(path)
-	// 	}
-	// 	return nil, eris.Wrap(err, "local store list "+parent)
-	// }
-
-	// var res []*FileMeta
-	// linq.From(stats).Where(func(x interface{}) bool {
-	// 	n := x.(os.DirEntry)
-	// 	return !n.IsDir() && strings.Compare(n.Name(), startFile) >= 0
-	// }).Select(func(x interface{}) interface{} {
-	// 	n := x.(os.DirEntry)
-	// 	info, _ := n.Info()
-	// 	return &FileMeta{
-	// 		path:         filepath.Join(parent, n.Name()),
-	// 		timeModified: info.ModTime(),
-	// 		size:         uint64(info.Size()),
-	// 	}
-	// }).Sort(func(i, j interface{}) bool {
-	// 	return strings.Compare(i.(*FileMeta).path, j.(*FileMeta).path) < 0
-	// }).ToSlice(&res)
-
-	// return iter.FromSlice(res), nil
 	return l.s.ListFrom(path)
 }
 
@@ -109,31 +77,11 @@ func (l *LocalStore) Write(path string, iter iter.Iter[string], overwrite bool) 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	path, _ = l.ResolvePathOnPhysicalStore(path)
+	path, err := l.ResolvePathOnPhysicalStore(path)
+	if err != nil {
+		return err
+	}
 
-	// if !overwrite {
-	// 	if _, err := os.Stat(path); err == nil {
-	// 		return deltaErrors.FileAlreadyExists(path)
-	// 	}
-	// }
-
-	// var err error
-	// w, err := newAtomicWriter(path)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// var line string
-	// for line, err = iter.Next(); err == nil; line, err = iter.Next() {
-	// 	if _, werr := w.Write([]byte(line + "\n")); werr != nil {
-	// 		return werr
-	// 	}
-	// }
-	// if err != nil && err != io.EOF {
-	// 	return err
-	// }
-
-	// return w.Close()
 	return l.s.Write(path, iter, overwrite)
 }
 

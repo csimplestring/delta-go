@@ -243,14 +243,21 @@ func checkpoint(store store.Store, snapshotToCheckpoint *snapshotImp) error {
 	wc := parquetActionWriterConfig{}
 	storageType := snapshotToCheckpoint.config.StorageConfig.Scheme
 	if storageType == Local {
-		wc.Local = &parquetActionLocalWriterConfig{}
+		wc.Local = &parquetActionLocalWriterConfig{
+			LogDir: snapshotToCheckpoint.config.StorageConfig.LogDir,
+		}
 	} else {
 		panic("unsupported storage type")
 	}
 
+	pw, err := newParquetActionWriter(&wc)
+	if err != nil {
+		return eris.Wrap(err, "newParquetActionWriter")
+	}
+
 	writer := &checkpointWriter{
 		schemaText: actionSchemaDefinitionString,
-		pw:         newParquetActionWriter(&wc),
+		pw:         pw,
 	}
 
 	checkpointMetadata, err := writer.write(snapshotToCheckpoint)
