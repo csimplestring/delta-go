@@ -13,11 +13,12 @@ import (
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/fileblob"
 
+	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
 )
 
 func newLocalStore(logDir string) (*baseStore, error) {
-	url := fmt.Sprintf("file://%s?create_dir=true", logDir)
+	url := fmt.Sprintf("file://%s?create_dir=true&metadata=skip", logDir)
 	bucket, err := blob.OpenBucket(context.Background(), url)
 	if err != nil {
 		return nil, err
@@ -80,6 +81,12 @@ func (l *LocalStore) Write(path string, iter iter.Iter[string], overwrite bool) 
 	path, err := l.ResolvePathOnPhysicalStore(path)
 	if err != nil {
 		return err
+	}
+
+	if !overwrite {
+		if _, err := os.Stat(filepath.Join(l.LogPath, path)); err == nil {
+			return errno.FileAlreadyExists(path)
+		}
 	}
 
 	return l.s.Write(path, iter, overwrite)
