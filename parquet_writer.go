@@ -31,7 +31,7 @@ type parquetActionLocalWriterConfig struct {
 
 func newParquetActionWriter(config *parquetActionWriterConfig) (parquetActionWriter, error) {
 	if config.Local != nil {
-		url := fmt.Sprintf("file://%s?create_dir=true", config.Local.LogDir)
+		url := fmt.Sprintf("file://%s?create_dir=true&metadata=skip", config.Local.LogDir)
 		bucket, err := blob.OpenBucket(context.Background(), url)
 		if err != nil {
 			return nil, err
