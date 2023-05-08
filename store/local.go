@@ -17,16 +17,22 @@ import (
 	"github.com/csimplestring/delta-go/iter"
 )
 
-func newLocalStore(logDir string) (*baseStore, error) {
+func newLocalStore(logDir string) (*LocalStore, error) {
 	url := fmt.Sprintf("file://%s?create_dir=true&metadata=skip", logDir)
 	bucket, err := blob.OpenBucket(context.Background(), url)
 	if err != nil {
 		return nil, err
 	}
-	return &baseStore{
+
+	s := &baseStore{
 		logDir: logDir,
 		bucket: bucket,
+	}
+	return &LocalStore{
+		LogPath: logDir,
+		s:       s,
 	}, nil
+
 }
 
 type LocalStore struct {
