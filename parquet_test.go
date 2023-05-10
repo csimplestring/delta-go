@@ -17,8 +17,9 @@ func TestLocalParquetReadWrite(t *testing.T) {
 	dir, err := filepath.Abs("./")
 	assert.NoError(t, err)
 
-	w, err := newParquetActionWriter(&parquetActionWriterConfig{
-		Local: &parquetActionLocalWriterConfig{
+	w, err := newParquetActionWriter(Config{
+		StorageConfig: StorageConfig{
+			Scheme: Local,
 			LogDir: dir,
 		},
 	})

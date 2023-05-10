@@ -13,7 +13,7 @@ func TestLocalStore_ListFrom(t *testing.T) {
 	p, err := filepath.Abs("../tests/golden/checkpoint/_delta_log/")
 	assert.NoError(t, err)
 
-	s, err := newLocalStore(p)
+	s, err := NewFileLogStore(p)
 	assert.NoError(t, err)
 
 	it, err := s.ListFrom("00000000000000000007.json")

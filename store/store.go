@@ -75,7 +75,7 @@ func New(path string) (Store, error) {
 	if p.Scheme == "file" {
 		p.Scheme = ""
 		v := p.String()
-		return newLocalStore(v)
+		return NewFileLogStore(v)
 	}
 
 	return nil, errno.UnsupportedFileSystem(path)

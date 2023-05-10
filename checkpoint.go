@@ -239,20 +239,10 @@ func GetLatestCompleteCheckpointFromList(instances []*CheckpointInstance, notLat
 }
 
 func checkpoint(store store.Store, snapshotToCheckpoint *snapshotImp) error {
-	//var checkpointWriter *checkpointWriter
-	wc := parquetActionWriterConfig{}
-	storageType := snapshotToCheckpoint.config.StorageConfig.Scheme
-	if storageType == Local {
-		wc.Local = &parquetActionLocalWriterConfig{
-			LogDir: snapshotToCheckpoint.config.StorageConfig.LogDir,
-		}
-	} else {
-		panic("unsupported storage type")
-	}
 
-	pw, err := newParquetActionWriter(&wc)
+	pw, err := newParquetActionWriter(snapshotToCheckpoint.config)
 	if err != nil {
-		return eris.Wrap(err, "newParquetActionWriter")
+		return eris.Wrap(err, "can not new ParquetActionWriter")
 	}
 
 	writer := &checkpointWriter{

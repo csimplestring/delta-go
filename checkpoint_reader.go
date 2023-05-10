@@ -2,15 +2,14 @@ package deltago
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/csimplestring/delta-go/action"
-	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
 	goparquet "github.com/fraugster/parquet-go"
 	"github.com/fraugster/parquet-go/floor/interfaces"
 	"github.com/rotisserie/eris"
 	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/azureblob"
 	_ "gocloud.dev/blob/fileblob"
 )
 
@@ -19,27 +18,22 @@ type checkpointReader interface {
 }
 
 func newCheckpointReader(config Config) (checkpointReader, error) {
-	if config.StorageConfig.Scheme == Local {
-		url := fmt.Sprintf("file://%s?create_dir=true", config.StorageConfig.LogDir)
-		bucket, err := blob.OpenBucket(context.Background(), url)
-		if err != nil {
-			return nil, err
-		}
-
-		return &localCheckpointReader{
-			bucket: bucket,
-		}, nil
+	b, err := configureBucket(config)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, eris.Wrap(errno.ErrIllegalArgument, "unsupported storage scheme "+string(config.StorageConfig.Scheme))
+	return &defaultCheckpointReader{
+		bucket: b,
+	}, nil
 }
 
-// LocalCheckpointReader implements checkpoint reader
-type localCheckpointReader struct {
+// defaultCheckpointReader implements checkpoint reader
+type defaultCheckpointReader struct {
 	bucket *blob.Bucket
 }
 
-func (l *localCheckpointReader) Read(path string) (iter.Iter[action.Action], error) {
+func (l *defaultCheckpointReader) Read(path string) (iter.Iter[action.Action], error) {
 
 	r, err := l.bucket.NewReader(context.Background(), path, nil)
 	if err != nil {
@@ -51,18 +45,18 @@ func (l *localCheckpointReader) Read(path string) (iter.Iter[action.Action], err
 		return nil, err
 	}
 
-	return &localParquetIterater{
+	return &defaultParquetIterater{
 		br:     r,
 		reader: fr,
 	}, nil
 }
 
-type localParquetIterater struct {
+type defaultParquetIterater struct {
 	br     *blob.Reader
 	reader *goparquet.FileReader
 }
 
-func (p *localParquetIterater) Next() (action.Action, error) {
+func (p *defaultParquetIterater) Next() (action.Action, error) {
 	data, err := p.reader.NextRow()
 	if err != nil {
 		return nil, err
@@ -78,7 +72,7 @@ func (p *localParquetIterater) Next() (action.Action, error) {
 	return am.a.Unwrap(), nil
 }
 
-func (p *localParquetIterater) Close() error {
+func (p *defaultParquetIterater) Close() error {
 	return p.br.Close()
 }
 

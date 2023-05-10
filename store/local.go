@@ -17,7 +17,7 @@ import (
 	"github.com/csimplestring/delta-go/iter"
 )
 
-func newLocalStore(logDir string) (*LocalStore, error) {
+func NewFileLogStore(logDir string) (*LocalStore, error) {
 	url := fmt.Sprintf("file://%s?create_dir=true&metadata=skip", logDir)
 	bucket, err := blob.OpenBucket(context.Background(), url)
 	if err != nil {

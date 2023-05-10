@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -19,11 +20,14 @@ import (
 	_ "gocloud.dev/blob/azureblob"
 )
 
-func newAzureBlobStore(container string, logDir string, localemu bool) (*AzureLogStore, error) {
+func NewAzureBlobLogStore(container string, logDir string, localemu bool) (*AzureBlobLogStore, error) {
 	var url string
 	if localemu {
 		url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", container, logDir)
 	} else {
+		if _, exist := os.LookupEnv("AZURE_CONNECTION_STR"); !exist {
+			return nil, eris.Errorf("AZURE_CONNECTION_STR evn var is required")
+		}
 		url = fmt.Sprintf("azblob://%s?prefix=%s", container, logDir)
 	}
 
@@ -52,25 +56,25 @@ func newAzureBlobStore(container string, logDir string, localemu bool) (*AzureLo
 		},
 	}
 
-	return &AzureLogStore{
+	return &AzureBlobLogStore{
 		logDir: logDir,
 		s:      s,
 	}, nil
 }
 
-type AzureLogStore struct {
+type AzureBlobLogStore struct {
 	logDir string
 	s      *baseStore
 }
 
-func (a *AzureLogStore) Root() string {
+func (a *AzureBlobLogStore) Root() string {
 	return ""
 }
 
 // Read the given file and return an `Iterator` of lines, with line breaks removed from
 // each line. Callers of this function are responsible to close the iterator if they are
 // done with it.
-func (a *AzureLogStore) Read(path string) (iter.Iter[string], error) {
+func (a *AzureBlobLogStore) Read(path string) (iter.Iter[string], error) {
 	path, err := a.ResolvePathOnPhysicalStore(path)
 	if err != nil {
 		return nil, err
@@ -80,7 +84,7 @@ func (a *AzureLogStore) Read(path string) (iter.Iter[string], error) {
 }
 
 // List the paths in the same directory that are lexicographically greater or equal to (UTF-8 sorting) the given `path`. The result should also be sorted by the file name.
-func (a *AzureLogStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
+func (a *AzureBlobLogStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 	path, err := a.ResolvePathOnPhysicalStore(path)
 	if err != nil {
 		return nil, err
@@ -94,7 +98,7 @@ func (a *AzureLogStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 // exists and overwrite = false. Furthermore, if isPartialWriteVisible returns false,
 // implementation must ensure that the entire file is made visible atomically, that is,
 // it should not generate partial files.
-func (a *AzureLogStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
+func (a *AzureBlobLogStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
 
 	path, err := a.ResolvePathOnPhysicalStore(path)
 	if err != nil {
@@ -105,7 +109,7 @@ func (a *AzureLogStore) Write(path string, actions iter.Iter[string], overwrite 
 }
 
 // Resolve the fully qualified path for the given `path`.
-func (a *AzureLogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
+func (a *AzureBlobLogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
 	path = strings.TrimPrefix(path, "azblob://")
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
@@ -122,6 +126,6 @@ func (a *AzureLogStore) ResolvePathOnPhysicalStore(path string) (string, error) 
 }
 
 // Whether a partial write is visible for the underlying file system of `path`.
-func (a *AzureLogStore) IsPartialWriteVisible(path string) bool {
+func (a *AzureBlobLogStore) IsPartialWriteVisible(path string) bool {
 	return false
 }

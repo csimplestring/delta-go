@@ -2,7 +2,6 @@ package deltago
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
@@ -21,37 +20,25 @@ type parquetActionWriter interface {
 	Close() error
 }
 
-type parquetActionWriterConfig struct {
-	Local *parquetActionLocalWriterConfig
-}
-
-type parquetActionLocalWriterConfig struct {
-	LogDir string
-}
-
-func newParquetActionWriter(config *parquetActionWriterConfig) (parquetActionWriter, error) {
-	if config.Local != nil {
-		url := fmt.Sprintf("file://%s?create_dir=true&metadata=skip", config.Local.LogDir)
-		bucket, err := blob.OpenBucket(context.Background(), url)
-		if err != nil {
-			return nil, err
-		}
-		return &localParquetActionWriter{
-			bucket: bucket,
-		}, nil
+func newParquetActionWriter(config Config) (parquetActionWriter, error) {
+	b, err := configureBucket(config)
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
+	return &defaultParquetActionWriter{
+		bucket: b,
+	}, nil
 }
 
-// localParquetActionWriter uses os.Rename to achive the atomic writes.
-type localParquetActionWriter struct {
+// defaultParquetActionWriter uses os.Rename to achive the atomic writes.
+type defaultParquetActionWriter struct {
 	name   string
 	bucket *blob.Bucket
 	bw     *blob.Writer
 	fw     *pq.FileWriter
 }
 
-func (l *localParquetActionWriter) Open(path string, schemaString string) error {
+func (l *defaultParquetActionWriter) Open(path string, schemaString string) error {
 
 	exists, err := l.bucket.Exists(context.Background(), path)
 	if err != nil {
@@ -82,7 +69,7 @@ func (l *localParquetActionWriter) Open(path string, schemaString string) error 
 	return nil
 }
 
-func (l *localParquetActionWriter) Write(a *action.SingleAction) error {
+func (l *defaultParquetActionWriter) Write(a *action.SingleAction) error {
 	obj := interfaces.NewMarshallObjectWithSchema(nil, l.fw.GetSchemaDefinition())
 	am := &actionMarshaller{a: a}
 	if err := am.MarshalParquet(obj); err != nil {
@@ -95,7 +82,7 @@ func (l *localParquetActionWriter) Write(a *action.SingleAction) error {
 	return nil
 }
 
-func (l *localParquetActionWriter) Close() error {
+func (l *defaultParquetActionWriter) Close() error {
 
 	if err := l.fw.Close(); err != nil {
 		return eris.Wrap(err, "parquet file writer close error")
