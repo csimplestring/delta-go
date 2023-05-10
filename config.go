@@ -140,7 +140,7 @@ type StorageConfig struct {
 	AzureBlobProtocol  string
 }
 
-func newLogStore(config Config) (store.Store, error) {
+func configureLogStore(config Config) (store.Store, error) {
 	sc := config.StorageConfig
 	if sc.Scheme == Local {
 		return store.NewFileLogStore(sc.LogDir)
