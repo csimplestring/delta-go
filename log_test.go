@@ -327,10 +327,7 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 
 	lastcheckpoint1 := lc.MustGet()
 
-	fs, err := store.GetFileSystem(logImpl1.logPath + LastCheckpointPath)
-	assert.NoError(t, err)
-
-	err = fs.Create(logImpl1.logPath+LastCheckpointPath, true)
+	err = logImpl1.store.Create(logImpl1.logPath + LastCheckpointPath)
 	assert.NoError(t, err)
 
 	table2, err := ForTable("file://"+destTableDir,

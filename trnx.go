@@ -86,7 +86,6 @@ type optimisticTransactionImp struct {
 	commitAttemptStartTime int64
 	clock                  Clock
 
-	fs             store.FS
 	configurations tableConfigurations
 	lock           *sync.Mutex
 	logStore       store.Store
@@ -96,7 +95,6 @@ type optimisticTransactionImp struct {
 func newOptimisticTransaction(snapshot *snapshotImp,
 	snapshotManager *SnapshotReader,
 	clock Clock,
-	fs store.FS,
 	configuration tableConfigurations,
 	lock *sync.Mutex,
 	logStore store.Store,
@@ -117,7 +115,6 @@ func newOptimisticTransaction(snapshot *snapshotImp,
 		commitAttemptStartTime: 0,
 
 		clock:          clock,
-		fs:             fs,
 		configurations: configuration,
 		lock:           lock,
 		logStore:       logStore,

@@ -59,14 +59,8 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
-	var fs store.FS
 
 	logStore, err := configureLogStore(config)
-	if err != nil {
-		return nil, err
-	}
-
-	fs, err = store.GetFileSystem(logPath)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +81,6 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 		logPath:        logPath,
 		clock:          clock,
 		store:          logStore,
-		fs:             fs,
 		deltaLogLock:   deltaLogLock,
 		history:        historyManager,
 		snapshotReader: snaptshotManager,
@@ -141,7 +134,6 @@ type logImpl struct {
 	logPath        string
 	clock          Clock
 	store          store.Store
-	fs             store.FS
 	deltaLogLock   *sync.Mutex
 	history        *historyManager
 	snapshotReader *SnapshotReader
@@ -171,7 +163,7 @@ func (l *logImpl) StartTransaction() (OptimisticTransaction, error) {
 		return nil, err
 	}
 	return newOptimisticTransaction(snapshot,
-		l.snapshotReader, l.clock, l.fs, nil, l.deltaLogLock, l.store, l.logPath), nil
+		l.snapshotReader, l.clock, nil, l.deltaLogLock, l.store, l.logPath), nil
 }
 
 func (l *logImpl) CommitInfoAt(version int64) (*action.CommitInfo, error) {
