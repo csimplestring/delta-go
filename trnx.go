@@ -476,7 +476,7 @@ func (trx *optimisticTransactionImp) prepareCommit(actions []action.Action) ([]a
 			return nil, err
 		}
 		if !exist {
-			if err := trx.logStore.Mkdirs(trx.logPath); err != nil {
+			if err := trx.logStore.Create(trx.logPath); err != nil {
 				return nil, err
 			}
 		}

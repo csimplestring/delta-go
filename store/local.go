@@ -107,8 +107,8 @@ func (l *LocalStore) Exists(path string) (bool, error) {
 	return l.s.Exists(path)
 }
 
-func (l *LocalStore) Mkdirs(path string) error {
-	return l.s.Mkdirs(path)
+func (l *LocalStore) Create(path string) error {
+	return l.s.Create(path)
 }
 
 type atomicWriter struct {

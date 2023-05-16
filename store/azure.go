@@ -134,6 +134,6 @@ func (a *AzureBlobLogStore) Exists(path string) (bool, error) {
 	return a.s.Exists(path)
 }
 
-func (a *AzureBlobLogStore) Mkdirs(path string) error {
-	return a.s.Mkdirs(path)
+func (a *AzureBlobLogStore) Create(path string) error {
+	return a.s.Create(path)
 }

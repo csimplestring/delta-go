@@ -49,7 +49,7 @@ type Store interface {
 
 	Exists(path string) (bool, error)
 
-	Mkdirs(path string) error
+	Create(path string) error
 }
 
 type FileMeta struct {

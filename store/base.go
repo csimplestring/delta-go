@@ -113,8 +113,6 @@ func (b *baseStore) Exists(path string) (bool, error) {
 	return b.bucket.Exists(context.Background(), path)
 }
 
-func (b *baseStore) Mkdirs(path string) error {
-	path = strings.TrimSuffix(path, "/") + "/"
-
+func (b *baseStore) Create(path string) error {
 	return b.bucket.WriteAll(context.Background(), path, []byte{}, nil)
 }
