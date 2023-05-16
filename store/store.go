@@ -46,6 +46,10 @@ type Store interface {
 
 	// Whether a partial write is visible for the underlying file system of `path`.
 	IsPartialWriteVisible(path string) bool
+
+	Exists(path string) (bool, error)
+
+	Mkdirs(path string) error
 }
 
 type FileMeta struct {

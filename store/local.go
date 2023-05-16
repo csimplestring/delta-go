@@ -103,6 +103,14 @@ func (l *LocalStore) IsPartialWriteVisible(path string) bool {
 	return false
 }
 
+func (l *LocalStore) Exists(path string) (bool, error) {
+	return l.s.Exists(path)
+}
+
+func (l *LocalStore) Mkdirs(path string) error {
+	return l.s.Mkdirs(path)
+}
+
 type atomicWriter struct {
 	name string
 	tf   *os.File

@@ -129,3 +129,11 @@ func (a *AzureBlobLogStore) ResolvePathOnPhysicalStore(path string) (string, err
 func (a *AzureBlobLogStore) IsPartialWriteVisible(path string) bool {
 	return false
 }
+
+func (a *AzureBlobLogStore) Exists(path string) (bool, error) {
+	return a.s.Exists(path)
+}
+
+func (a *AzureBlobLogStore) Mkdirs(path string) error {
+	return a.s.Mkdirs(path)
+}

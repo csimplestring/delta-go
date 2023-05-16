@@ -116,6 +116,5 @@ func (b *baseStore) Exists(path string) (bool, error) {
 func (b *baseStore) Mkdirs(path string) error {
 	path = strings.TrimSuffix(path, "/") + "/"
 
-	_, err := blob.OpenBucket(context.Background(), path+"?create_dir=true")
-	return err
+	return b.bucket.WriteAll(context.Background(), path, []byte{}, nil)
 }

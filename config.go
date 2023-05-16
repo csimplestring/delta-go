@@ -149,7 +149,7 @@ func configureLogStore(config Config) (store.Store, error) {
 		return store.NewAzureBlobLogStore(sc.AzureBlobContainer, sc.LogDir, sc.AzureLocalEmulate)
 	}
 
-	return nil, fmt.Errorf("Can not create log store because No Storage Scheme defined")
+	return nil, fmt.Errorf("can not create log store because No Storage Scheme defined")
 }
 
 func configureBucket(config Config) (*blob.Bucket, error) {
