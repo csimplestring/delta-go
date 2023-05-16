@@ -48,6 +48,7 @@ func getTestConfig() Config {
 	return Config{
 		StorageConfig: StorageConfig{
 			Scheme: Local,
+			LogDir: "",
 		},
 	}
 }

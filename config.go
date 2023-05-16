@@ -143,6 +143,7 @@ type StorageConfig struct {
 func configureLogStore(config Config) (store.Store, error) {
 	sc := config.StorageConfig
 	if sc.Scheme == Local {
+		sc.LogDir = strings.TrimPrefix(sc.LogDir, "file://")
 		return store.NewFileLogStore(sc.LogDir)
 	} else if sc.Scheme == AzureBlob {
 		return store.NewAzureBlobLogStore(sc.AzureBlobContainer, sc.LogDir, sc.AzureLocalEmulate)

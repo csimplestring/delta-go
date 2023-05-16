@@ -108,3 +108,14 @@ func (l *listingIter) Next() (*FileMeta, error) {
 func (l *listingIter) Close() error {
 	return nil
 }
+
+func (b *baseStore) Exists(path string) (bool, error) {
+	return b.bucket.Exists(context.Background(), path)
+}
+
+func (b *baseStore) Mkdirs(path string) error {
+	path = strings.TrimSuffix(path, "/") + "/"
+
+	_, err := blob.OpenBucket(context.Background(), path+"?create_dir=true")
+	return err
+}

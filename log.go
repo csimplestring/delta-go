@@ -61,7 +61,7 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 	var logStore store.Store
 	var fs store.FS
 
-	logStore, err := store.New(logPath)
+	logStore, err := configureLogStore(config)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +95,46 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 
 	return logImpl, nil
 }
+
+// func ForTableV2(config Config, clock Clock) (Log, error) {
+// 	deltaLogLock := &sync.Mutex{}
+// 	var logStore store.Store
+// 	var fs store.FS
+
+// 	logStore, err := configureLogStore(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	fs, err = store.GetFileSystem(logPath)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	parquetReader, err := newCheckpointReader(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	historyManager := &historyManager{logStore: logStore}
+// 	snaptshotManager, err := newSnapshotReader(config, parquetReader, logStore, clock, historyManager, deltaLogLock)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	logImpl := &logImpl{
+// 		dataPath:       dataPath,
+// 		logPath:        logPath,
+// 		clock:          clock,
+// 		store:          logStore,
+// 		fs:             fs,
+// 		deltaLogLock:   deltaLogLock,
+// 		history:        historyManager,
+// 		snapshotReader: snaptshotManager,
+// 	}
+
+// 	return logImpl, nil
+// }
 
 type logImpl struct {
 	dataPath       string
