@@ -238,9 +238,9 @@ func GetLatestCompleteCheckpointFromList(instances []*CheckpointInstance, notLat
 	return mo.None[*CheckpointInstance]()
 }
 
-func checkpoint(store store.Store, snapshotToCheckpoint *snapshotImp) error {
+func checkpoint(logPath string, store store.Store, snapshotToCheckpoint *snapshotImp) error {
 
-	pw, err := newParquetActionWriter(snapshotToCheckpoint.config)
+	pw, err := newParquetActionWriter(logPath)
 	if err != nil {
 		return eris.Wrap(err, "can not new ParquetActionWriter")
 	}

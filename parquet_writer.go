@@ -12,6 +12,8 @@ import (
 	"github.com/fraugster/parquet-go/parquetschema"
 	"github.com/rotisserie/eris"
 	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/azureblob"
+	_ "gocloud.dev/blob/fileblob"
 )
 
 type parquetActionWriter interface {
@@ -20,8 +22,8 @@ type parquetActionWriter interface {
 	Close() error
 }
 
-func newParquetActionWriter(config Config) (parquetActionWriter, error) {
-	b, err := configureBucket(config)
+func newParquetActionWriter(urlstr string) (parquetActionWriter, error) {
+	b, err := blob.OpenBucket(context.Background(), urlstr)
 	if err != nil {
 		return nil, err
 	}

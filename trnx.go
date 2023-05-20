@@ -658,7 +658,7 @@ func (trx *optimisticTransactionImp) postCommit(commitVersion int64) error {
 		if err != nil {
 			return err
 		}
-		if err := checkpoint(trx.logStore, snaptshot); err != nil {
+		if err := checkpoint(trx.logPath, trx.logStore, snaptshot); err != nil {
 			if eris.Is(err, errno.ErrIllegalState) {
 				log.Println("Failed to checkpoint table state." + err.Error())
 			} else {

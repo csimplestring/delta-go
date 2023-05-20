@@ -1,18 +1,13 @@
 package deltago
 
 import (
-	"context"
-	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/barweiss/go-tuple"
 	"github.com/csimplestring/delta-go/action"
-	"github.com/rotisserie/eris"
 	duration "github.com/xhit/go-str2duration/v2"
-	"gocloud.dev/blob"
 )
 
 type Config struct {
@@ -139,29 +134,29 @@ type StorageConfig struct {
 	AzureBlobProtocol  string
 }
 
-func configureBucket(config Config) (*blob.Bucket, error) {
-	if config.StorageConfig.Scheme == Local {
-		url := fmt.Sprintf("file://%s?create_dir=true", config.StorageConfig.LogDir)
-		return blob.OpenBucket(context.Background(), url)
+// func configureBucket(config Config) (*blob.Bucket, error) {
+// 	if config.StorageConfig.Scheme == Local {
+// 		url := fmt.Sprintf("file://%s?create_dir=true", config.StorageConfig.LogDir)
+// 		return blob.OpenBucket(context.Background(), url)
 
-	} else if config.StorageConfig.Scheme == AzureBlob {
-		var url string
+// 	} else if config.StorageConfig.Scheme == AzureBlob {
+// 		var url string
 
-		if config.StorageConfig.AzureLocalEmulate {
-			url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s",
-				config.StorageConfig.AzureBlobContainer,
-				config.StorageConfig.LogDir)
-		} else {
-			if _, exist := os.LookupEnv("AZURE_CONNECTION_STR"); !exist {
-				return nil, eris.Errorf("AZURE_CONNECTION_STR evn var is required")
-			}
-			url = fmt.Sprintf("azblob://%s?prefix=%s",
-				config.StorageConfig.AzureBlobContainer,
-				config.StorageConfig.LogDir)
-		}
+// 		if config.StorageConfig.AzureLocalEmulate {
+// 			url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s",
+// 				config.StorageConfig.AzureBlobContainer,
+// 				config.StorageConfig.LogDir)
+// 		} else {
+// 			if _, exist := os.LookupEnv("AZURE_CONNECTION_STR"); !exist {
+// 				return nil, eris.Errorf("AZURE_CONNECTION_STR evn var is required")
+// 			}
+// 			url = fmt.Sprintf("azblob://%s?prefix=%s",
+// 				config.StorageConfig.AzureBlobContainer,
+// 				config.StorageConfig.LogDir)
+// 		}
 
-		return blob.OpenBucket(context.Background(), url)
-	}
+// 		return blob.OpenBucket(context.Background(), url)
+// 	}
 
-	return nil, eris.Errorf("no storage configuration scheme specified")
-}
+// 	return nil, eris.Errorf("no storage configuration scheme specified")
+// }
