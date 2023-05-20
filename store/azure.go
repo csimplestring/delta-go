@@ -2,8 +2,6 @@ package store
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -20,18 +18,18 @@ import (
 	_ "gocloud.dev/blob/azureblob"
 )
 
-func NewAzureBlobLogStore(container string, logDir string, localemu bool) (*AzureBlobLogStore, error) {
-	var url string
-	if localemu {
-		url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", container, logDir)
-	} else {
-		if _, exist := os.LookupEnv("AZURE_CONNECTION_STR"); !exist {
-			return nil, eris.Errorf("AZURE_CONNECTION_STR evn var is required")
-		}
-		url = fmt.Sprintf("azblob://%s?prefix=%s", container, logDir)
-	}
+func NewAzureBlobLogStore(logDir string) (*AzureBlobLogStore, error) {
+	// var url string
+	// if localemu {
+	// 	url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", container, logDir)
+	// } else {
+	// 	if _, exist := os.LookupEnv("AZURE_CONNECTION_STR"); !exist {
+	// 		return nil, eris.Errorf("AZURE_CONNECTION_STR evn var is required")
+	// 	}
+	// 	url = fmt.Sprintf("azblob://%s?prefix=%s", container, logDir)
+	// }
 
-	bucket, err := goblob.OpenBucket(context.Background(), url)
+	bucket, err := goblob.OpenBucket(context.Background(), logDir)
 	if err != nil {
 		return nil, err
 	}

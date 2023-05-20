@@ -77,9 +77,9 @@ func New(path string) (Store, error) {
 	}
 
 	if p.Scheme == "file" {
-		p.Scheme = ""
-		v := p.String()
-		return NewFileLogStore(v)
+		return NewFileLogStore(path)
+	} else if p.Scheme == "azblob" {
+		return NewAzureBlobLogStore(path)
 	}
 
 	return nil, errno.UnsupportedFileSystem(path)

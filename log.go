@@ -60,7 +60,7 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
 
-	logStore, err := configureLogStore(config)
+	logStore, err := store.New(logPath)
 	if err != nil {
 		return nil, err
 	}

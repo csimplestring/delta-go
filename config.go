@@ -10,7 +10,6 @@ import (
 
 	"github.com/barweiss/go-tuple"
 	"github.com/csimplestring/delta-go/action"
-	"github.com/csimplestring/delta-go/store"
 	"github.com/rotisserie/eris"
 	duration "github.com/xhit/go-str2duration/v2"
 	"gocloud.dev/blob"
@@ -138,18 +137,6 @@ type StorageConfig struct {
 	AzureLocalEmulate  bool
 	AzureBlobDomain    string
 	AzureBlobProtocol  string
-}
-
-func configureLogStore(config Config) (store.Store, error) {
-	sc := config.StorageConfig
-	if sc.Scheme == Local {
-		sc.LogDir = strings.TrimPrefix(sc.LogDir, "file://")
-		return store.NewFileLogStore(sc.LogDir)
-	} else if sc.Scheme == AzureBlob {
-		return store.NewAzureBlobLogStore(sc.AzureBlobContainer, sc.LogDir, sc.AzureLocalEmulate)
-	}
-
-	return nil, fmt.Errorf("can not create log store because No Storage Scheme defined")
 }
 
 func configureBucket(config Config) (*blob.Bucket, error) {

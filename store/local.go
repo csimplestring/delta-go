@@ -2,8 +2,8 @@ package store
 
 import (
 	"context"
-	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,26 +17,45 @@ import (
 	"github.com/csimplestring/delta-go/iter"
 )
 
-func NewFileLogStore(logDir string) (*LocalStore, error) {
-	url := fmt.Sprintf("file://%s?create_dir=true&metadata=skip", logDir)
-	bucket, err := blob.OpenBucket(context.Background(), url)
+func buildLocalUrl(logDirUrl string) (string, error) {
+	p, err := url.Parse(logDirUrl)
+	if err != nil {
+		return "", eris.Wrap(err, "could not parse local log dir url")
+	}
+	q := p.Query()
+	q.Set("create_dir", "true")
+	q.Set("metadata", "skip")
+	p.RawQuery = q.Encode()
+
+	return p.String(), nil
+}
+
+func NewFileLogStore(logDirUrl string) (*LocalStore, error) {
+	// logDir is like: file://a/b/c
+	urlstr, err := buildLocalUrl(logDirUrl)
 	if err != nil {
 		return nil, err
 	}
 
+	bucket, err := blob.OpenBucket(context.Background(), urlstr)
+	if err != nil {
+		return nil, err
+	}
+	// remove file:// protocol
+	logDir := strings.TrimPrefix(logDirUrl, "file://")
 	s := &baseStore{
-		logDir: logDir,
+		logDir: logDirUrl,
 		bucket: bucket,
 	}
 	return &LocalStore{
-		LogPath: logDir,
+		logPath: logDir,
 		s:       s,
 	}, nil
 
 }
 
 type LocalStore struct {
-	LogPath string
+	logPath string
 	s       *baseStore
 	mu      sync.Mutex
 }
@@ -56,8 +75,10 @@ func (l *LocalStore) ResolvePathOnPhysicalStore(path string) (string, error) {
 		return base, nil
 	}
 
-	if strings.TrimSuffix(l.LogPath, "/") != strings.TrimSuffix(dir, "/") {
-		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", l.LogPath, dir)
+	cleanLogPath := strings.TrimSuffix(l.logPath, "/")
+	cleanDir := strings.TrimSuffix(dir, "/")
+	if cleanLogPath != cleanDir {
+		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", l.logPath, dir)
 	}
 	return base, nil
 }
@@ -90,7 +111,7 @@ func (l *LocalStore) Write(path string, iter iter.Iter[string], overwrite bool) 
 	}
 
 	if !overwrite {
-		if _, err := os.Stat(filepath.Join(l.LogPath, path)); err == nil {
+		if _, err := os.Stat(filepath.Join(l.logPath, path)); err == nil {
 			return errno.FileAlreadyExists(path)
 		}
 	}

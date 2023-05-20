@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -13,7 +14,7 @@ func TestLocalStore_ListFrom(t *testing.T) {
 	p, err := filepath.Abs("../tests/golden/checkpoint/_delta_log/")
 	assert.NoError(t, err)
 
-	s, err := NewFileLogStore(p)
+	s, err := NewFileLogStore(fmt.Sprintf("file://%s", p))
 	assert.NoError(t, err)
 
 	it, err := s.ListFrom("00000000000000000007.json")
