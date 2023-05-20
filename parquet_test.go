@@ -1,6 +1,7 @@
 package deltago
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -176,12 +177,7 @@ func TestLocalParquetReadWrite(t *testing.T) {
 	err = w.Close()
 	assert.NoError(t, err)
 
-	r, err := newCheckpointReader(Config{
-		StorageConfig: StorageConfig{
-			Scheme: Local,
-			LogDir: dir,
-		},
-	})
+	r, err := newCheckpointReader(fmt.Sprintf("file://%s", dir))
 	assert.NoError(t, err)
 
 	it, err := r.Read(path)

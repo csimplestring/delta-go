@@ -17,8 +17,8 @@ type checkpointReader interface {
 	Read(path string) (iter.Iter[action.Action], error)
 }
 
-func newCheckpointReader(config Config) (checkpointReader, error) {
-	b, err := configureBucket(config)
+func newCheckpointReader(urlstr string) (checkpointReader, error) {
+	b, err := blob.OpenBucket(context.Background(), urlstr)
 	if err != nil {
 		return nil, err
 	}

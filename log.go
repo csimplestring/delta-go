@@ -65,7 +65,7 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 		return nil, err
 	}
 
-	parquetReader, err := newCheckpointReader(config)
+	parquetReader, err := newCheckpointReader(logPath)
 	if err != nil {
 		return nil, err
 	}
