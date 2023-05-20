@@ -16,11 +16,7 @@ func TestLocalExample(t *testing.T) {
 
 	path = "file://" + path + "/"
 
-	config := delta.Config{
-		StorageConfig: delta.StorageConfig{
-			Scheme: delta.Local,
-		},
-	}
+	config := delta.Config{}
 
 	table, err := delta.ForTable(path, config, &delta.SystemClock{})
 	if err != nil {
