@@ -179,69 +179,58 @@ func TestLog_snapshot(t *testing.T) {
 }
 
 func TestLog_checkpoint(t *testing.T) {
-	table, err := getTestFileTable("checkpoint")
+
+	fileTable, err := getTestFileTable("checkpoint")
 	assert.NoError(t, err)
 
-	snapshot, err := table.Snapshot()
+	azblobTable, err := getTestAzBlobTable("checkpoint")
 	assert.NoError(t, err)
-	assert.NotNil(t, snapshot)
 
-	allFiles, err := snapshot.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, "15", allFiles[0].Path)
-	assert.Equal(t, int64(14), snapshot.Version())
-
-	scan, err := snapshot.Scan(nil)
-	assert.NoError(t, err)
-	assert.NotNil(t, scan)
-
-	iter, err := scan.Files()
-	assert.NoError(t, err)
-	assert.NotNil(t, iter)
-	defer iter.Close()
-
-	var res []string
-	var iterErr error
-	var f *action.AddFile
-	for f, iterErr = iter.Next(); iterErr == nil; f, iterErr = iter.Next() {
-		res = append(res, f.Path)
+	tests := []struct {
+		name  string
+		table Log
+	}{
+		{
+			"file table",
+			fileTable,
+		},
+		{
+			"az blob table",
+			azblobTable,
+		},
 	}
-	assert.ErrorIs(t, iterErr, io.EOF)
-	iter.Close()
-	assert.Equal(t, "15", res[0])
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot, err := tt.table.Snapshot()
+			assert.NoError(t, err)
+			assert.NotNil(t, snapshot)
 
-func TestLog_azcheckpoint(t *testing.T) {
-	table, err := getTestAzBlobTable("checkpoint")
-	assert.NoError(t, err)
+			allFiles, err := snapshot.AllFiles()
+			assert.NoError(t, err)
+			assert.Equal(t, "15", allFiles[0].Path)
+			assert.Equal(t, int64(14), snapshot.Version())
 
-	snapshot, err := table.Snapshot()
-	assert.NoError(t, err)
-	assert.NotNil(t, snapshot)
+			scan, err := snapshot.Scan(nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, scan)
 
-	allFiles, err := snapshot.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, "15", allFiles[0].Path)
-	assert.Equal(t, int64(14), snapshot.Version())
+			iter, err := scan.Files()
+			assert.NoError(t, err)
+			assert.NotNil(t, iter)
+			defer iter.Close()
 
-	scan, err := snapshot.Scan(nil)
-	assert.NoError(t, err)
-	assert.NotNil(t, scan)
-
-	iter, err := scan.Files()
-	assert.NoError(t, err)
-	assert.NotNil(t, iter)
-	defer iter.Close()
-
-	var res []string
-	var iterErr error
-	var f *action.AddFile
-	for f, iterErr = iter.Next(); iterErr == nil; f, iterErr = iter.Next() {
-		res = append(res, f.Path)
+			var res []string
+			var iterErr error
+			var f *action.AddFile
+			for f, iterErr = iter.Next(); iterErr == nil; f, iterErr = iter.Next() {
+				res = append(res, f.Path)
+			}
+			assert.ErrorIs(t, iterErr, io.EOF)
+			iter.Close()
+			assert.Equal(t, "15", res[0])
+		})
 	}
-	assert.ErrorIs(t, iterErr, io.EOF)
-	iter.Close()
-	assert.Equal(t, "15", res[0])
+
 }
 
 func TestLog_updateDeletedDir(t *testing.T) {
