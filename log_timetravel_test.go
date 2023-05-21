@@ -75,7 +75,7 @@ func TestLog_time_travel_versionAsOf(t *testing.T) {
 	err = copy.Copy(srcTableDir, destTableDir)
 	assert.NoError(t, err)
 
-	log, err := ForTable("file://"+destTableDir, getTestConfig(), &SystemClock{})
+	log, err := ForTable("file://"+destTableDir, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
 	fixture := newTimeTravelFixture()
@@ -120,7 +120,7 @@ func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_b
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestTable("time-travel-start-start20-start40")
+	log, err := getTestFileTable("time-travel-start-start20-start40")
 	assert.NoError(t, err)
 
 	s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 10).UnixMilli())
@@ -144,7 +144,7 @@ func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testi
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestTable("time-travel-start-start20-start40")
+	log, err := getTestFileTable("time-travel-start-start20-start40")
 	assert.NoError(t, err)
 
 	_, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 50).UnixMilli())
@@ -166,7 +166,7 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestTable("time-travel-start-start20-start40")
+	log, err := getTestFileTable("time-travel-start-start20-start40")
 	assert.NoError(t, err)
 
 	s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).UnixMilli())
@@ -186,7 +186,7 @@ func TestLog_time_travel_with_schema_changes_should_instantiate_old_schema(t *te
 	tablePath := getTestTableDir("time-travel-schema-changes-a")
 	orig_schema_data_files := getTestDirDataFile(tablePath)
 
-	log, err := getTestTable("time-travel-schema-changes-b")
+	log, err := getTestFileTable("time-travel-schema-changes-b")
 	assert.NoError(t, err)
 
 	f := newTimeTravelFixture()
@@ -222,7 +222,7 @@ func TestLog_time_travel_with_partition_changes_should_instantiate_old_schema(t 
 	// then append more data to that "same" table using a different partition
 	// reading version 0 should show only the original partition data files
 
-	log, err := getTestTable("time-travel-partition-changes-b")
+	log, err := getTestFileTable("time-travel-partition-changes-b")
 	assert.NoError(t, err)
 
 	s, err := log.SnapshotForVersionAsOf(0)

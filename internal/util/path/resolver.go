@@ -68,10 +68,11 @@ func Canonicalize(path string, schema string) (string, error) {
 
 	if schema == "file" {
 		return unixCanonicalize(path)
+	} else if schema == "azblob" {
+		return azblobCanonicalize(path)
 	}
 
-	return "", errno.UnsupportedFileSystem(schema)
-
+	return "", errno.UnsupportedFileSystem("the file schema " + schema + " is not supported")
 }
 
 func unixCanonicalize(p string) (string, error) {
@@ -85,5 +86,9 @@ func unixCanonicalize(p string) (string, error) {
 		return "file://" + p, nil
 	}
 
+	return p, nil
+}
+
+func azblobCanonicalize(p string) (string, error) {
 	return p, nil
 }

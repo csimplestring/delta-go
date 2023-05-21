@@ -93,7 +93,7 @@ func getTempLog(t *testing.T) (Log, string) {
 	dir, err := os.MkdirTemp("", "delta")
 	assert.NoError(t, err)
 
-	log, err := ForTable("file://"+dir, getTestConfig(), &SystemClock{})
+	log, err := ForTable("file://"+dir, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
 	return log, dir

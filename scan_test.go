@@ -38,7 +38,7 @@ func (s *scanTestFixture) withLog(actions []action.Action) (Log, string) {
 	dir, err := os.MkdirTemp("", "delta")
 	mustNoError(err)
 
-	log, err := ForTable("file://"+dir, getTestConfig(), &SystemClock{})
+	log, err := ForTable("file://"+dir, getTestFileConfig(), &SystemClock{})
 	mustNoError(err)
 
 	trx, err := log.StartTransaction()
@@ -212,7 +212,7 @@ func TestScan_correct_reverse_replay(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	log, err := ForTable("file://"+dir, getTestConfig(), &SystemClock{})
+	log, err := ForTable("file://"+dir, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
 	commit := func(actions []action.Action) {

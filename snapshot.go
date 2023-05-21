@@ -273,7 +273,10 @@ func (s *snapshotImp) loadState() (*snapshotState, error) {
 	for i, sa := range singleActions {
 		actions[i] = sa.Unwrap()
 	}
-	replay.Append(0, iter.FromSlice(actions))
+
+	if err := replay.Append(0, iter.FromSlice(actions)); err != nil {
+		return nil, err
+	}
 
 	if replay.currentProtocolVersion == nil {
 		return nil, errno.ActionNotFound("protocl", s.version)
