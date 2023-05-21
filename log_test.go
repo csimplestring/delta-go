@@ -26,15 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getTestLogDir(name string) string {
-	path, err := filepath.Abs(fmt.Sprintf("./tests/golden/%s/_delta_log/", name))
-	if err != nil {
-		panic(err)
-	}
-
-	return "file://" + path + "/"
-}
-
 func getTestTableDir(name string) string {
 	path, err := filepath.Abs(fmt.Sprintf("./tests/golden/%s/", name))
 	if err != nil {

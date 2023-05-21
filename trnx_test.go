@@ -511,47 +511,6 @@ func TestTrx_taint_whole_table_concurrent_remove(t *testing.T) {
 	checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
 }
 
-func testSchemaChange(schema1 *types.StructType,
-	schema2 *types.StructType,
-	hasError bool,
-	initialActions []action.Action,
-	commitActions []action.Action,
-	t *testing.T) {
-
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
-
-	schemaString1, err := types.ToJSON(schema1)
-	assert.NoError(t, err)
-	schemaString2, err := types.ToJSON(schema2)
-	assert.NoError(t, err)
-
-	metadata1 := &action.Metadata{SchemaString: schemaString1}
-	metadata2 := &action.Metadata{SchemaString: schemaString2}
-	f := newTrxTestFixture()
-
-	if len(initialActions) == 0 {
-		initialActions = append(initialActions, f.addA)
-	}
-
-	txn, err := log.StartTransaction()
-	assert.NoError(t, err)
-	_, err = txn.Commit(iter.FromSlice(append(initialActions, metadata1)), f.op, f.engineInfo)
-	assert.NoError(t, err)
-
-	if hasError {
-		txn, err := log.StartTransaction()
-		assert.NoError(t, err)
-		_, err = txn.Commit(iter.FromSlice(append(commitActions, metadata2)), f.op, f.engineInfo)
-		assert.ErrorIs(t, err, errno.ErrIllegalState)
-	} else {
-		txn, err := log.StartTransaction()
-		assert.NoError(t, err)
-		_, err = txn.Commit(iter.FromSlice(append(commitActions, metadata2)), f.op, f.engineInfo)
-		assert.NoError(t, err)
-	}
-}
-
 func TestTrx_can_change_schema_to_valid_schema(t *testing.T) {
 
 }

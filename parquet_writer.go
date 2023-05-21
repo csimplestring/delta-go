@@ -5,7 +5,7 @@ import (
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
-	goparquet "github.com/fraugster/parquet-go"
+
 	pq "github.com/fraugster/parquet-go"
 	"github.com/fraugster/parquet-go/floor/interfaces"
 	parq "github.com/fraugster/parquet-go/parquet"
@@ -60,8 +60,8 @@ func (l *defaultParquetActionWriter) Open(path string, schemaString string) erro
 		return err
 	}
 
-	fw := goparquet.NewFileWriter(bw,
-		goparquet.WithSchemaDefinition(schema),
+	fw := pq.NewFileWriter(bw,
+		pq.WithSchemaDefinition(schema),
 		pq.WithCompressionCodec(parq.CompressionCodec_SNAPPY))
 
 	l.name = path

@@ -1,7 +1,6 @@
 package deltago
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -20,16 +19,6 @@ func (r *PartitionRowRecord) getPrimitive(field *types.StructField) (string, err
 	partitionValue, ok := r.partitionValues[field.Name]
 	if !ok || len(partitionValue) == 0 {
 		return "", eris.Wrap(errno.NullValueFoundForPrimitiveTypes(field.Name), "")
-	}
-	return partitionValue, nil
-}
-
-func (r *PartitionRowRecord) getNonPrimitive(field *types.StructField) (string, error) {
-	partitionValue, ok := r.partitionValues[field.Name]
-	if !ok || len(partitionValue) == 0 {
-		if !field.Nullable {
-			return "", eris.Wrap(errno.NullValueFoundForNonNullSchemaField(field.Name, fmt.Sprintf("%+v", r.partitionSchema)), "")
-		}
 	}
 	return partitionValue, nil
 }
@@ -146,7 +135,7 @@ func (p *PartitionRowRecord) GetTimestamp(fieldName string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return time.Parse("2021-09-08 11:11:11", s)
+	return time.Parse("2006-01-02 15:04:05", s)
 }
 
 func (p *PartitionRowRecord) GetDate(fieldName string) (time.Time, error) {

@@ -227,21 +227,21 @@ func (h *historyManager) getCommits(logStore store.Store, logPath string, start 
 	return commits, nil
 }
 
-func (h *historyManager) monotonizeCommitTimestamps(commits []action.CommitMarker) []action.CommitMarker {
-	i := 0
-	length := len(commits)
-	for i < length-1 {
-		prevTimestamp := commits[i].GetTimestamp()
-		if commits[i].GetVersion() > commits[i+1].GetVersion() {
-			panic("Unordered commits provided.")
-		}
-		if prevTimestamp >= commits[i+1].GetTimestamp() {
-			commits[i+1] = commits[i+1].WithTimestamp(prevTimestamp + 1)
-		}
-		i += 1
-	}
-	return commits
-}
+// func (h *historyManager) monotonizeCommitTimestamps(commits []action.CommitMarker) []action.CommitMarker {
+// 	i := 0
+// 	length := len(commits)
+// 	for i < length-1 {
+// 		prevTimestamp := commits[i].GetTimestamp()
+// 		if commits[i].GetVersion() > commits[i+1].GetVersion() {
+// 			panic("Unordered commits provided.")
+// 		}
+// 		if prevTimestamp >= commits[i+1].GetTimestamp() {
+// 			commits[i+1] = commits[i+1].WithTimestamp(prevTimestamp + 1)
+// 		}
+// 		i += 1
+// 	}
+// 	return commits
+// }
 
 type commit struct {
 	version   int64
