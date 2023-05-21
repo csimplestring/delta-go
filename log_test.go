@@ -109,73 +109,92 @@ func TestLog_snapshot(t *testing.T) {
 		assert.Equal(t, expectedFiles, actual)
 	}
 
-	table, err := getTestFileTable("snapshot-data0")
-	assert.NoError(t, err)
-	s, err := table.Snapshot()
-	assert.NoError(t, err)
-	data0_files := getDirDataFiles(getTestTableDir("snapshot-data0"))
-	verify(s, data0_files, 0)
-
-	table, err = getTestFileTable("snapshot-data1")
-	assert.NoError(t, err)
-	s, err = table.Snapshot()
-	assert.NoError(t, err)
-	data0_data1_files := getDirDataFiles(getTestTableDir("snapshot-data1"))
-	verify(s, data0_data1_files, 1)
-
-	table, err = getTestFileTable("snapshot-data2")
-	assert.NoError(t, err)
-	s, err = table.Snapshot()
-	assert.NoError(t, err)
-	var data2_files []string
-	data0_data1_fileset := mapset.NewSet(data0_data1_files...)
-	// we have overwritten files for data0 & data1; only data2 files should remain
-	for _, f := range getDirDataFiles(getTestTableDir("snapshot-data2")) {
-		if !data0_data1_fileset.Contains(f) {
-			data2_files = append(data2_files, f)
-		}
+	tests := []struct {
+		name    string
+		tableFn func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"az blob table",
+			getTestAzBlobTable,
+		},
 	}
-	verify(s, data2_files, 2)
 
-	table, err = getTestFileTable("snapshot-data3")
-	assert.NoError(t, err)
-	s, err = table.Snapshot()
-	assert.NoError(t, err)
-	var data2_data3_files []string
-	for _, f := range getDirDataFiles(getTestTableDir("snapshot-data3")) {
-		if !data0_data1_fileset.Contains(f) {
-			data2_data3_files = append(data2_data3_files, f)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			table, err := tt.tableFn("snapshot-data0")
+			assert.NoError(t, err)
+			s, err := table.Snapshot()
+			assert.NoError(t, err)
+			data0_files := getDirDataFiles(getTestTableDir("snapshot-data0"))
+			verify(s, data0_files, 0)
+
+			table, err = tt.tableFn("snapshot-data1")
+			assert.NoError(t, err)
+			s, err = table.Snapshot()
+			assert.NoError(t, err)
+			data0_data1_files := getDirDataFiles(getTestTableDir("snapshot-data1"))
+			verify(s, data0_data1_files, 1)
+
+			table, err = tt.tableFn("snapshot-data2")
+			assert.NoError(t, err)
+			s, err = table.Snapshot()
+			assert.NoError(t, err)
+			var data2_files []string
+			data0_data1_fileset := mapset.NewSet(data0_data1_files...)
+			// we have overwritten files for data0 & data1; only data2 files should remain
+			for _, f := range getDirDataFiles(getTestTableDir("snapshot-data2")) {
+				if !data0_data1_fileset.Contains(f) {
+					data2_files = append(data2_files, f)
+				}
+			}
+			verify(s, data2_files, 2)
+
+			table, err = tt.tableFn("snapshot-data3")
+			assert.NoError(t, err)
+			s, err = table.Snapshot()
+			assert.NoError(t, err)
+			var data2_data3_files []string
+			for _, f := range getDirDataFiles(getTestTableDir("snapshot-data3")) {
+				if !data0_data1_fileset.Contains(f) {
+					data2_data3_files = append(data2_data3_files, f)
+				}
+			}
+			verify(s, data2_data3_files, 3)
+
+			table, err = tt.tableFn("snapshot-data2-deleted")
+			assert.NoError(t, err)
+			s, err = table.Snapshot()
+			assert.NoError(t, err)
+			var data3_files []string
+			data2_fileset := mapset.NewSet(data2_files...)
+			for _, f := range getDirDataFiles(getTestTableDir("snapshot-data2-deleted")) {
+				if !data0_data1_fileset.Contains(f) && !data2_fileset.Contains(f) {
+					data3_files = append(data3_files, f)
+				}
+			}
+			verify(s, data3_files, 4)
+
+			table, err = tt.tableFn("snapshot-repartitioned")
+			assert.NoError(t, err)
+			s, err = table.Snapshot()
+			assert.NoError(t, err)
+			allFiles, err := s.AllFiles()
+			assert.NoError(t, err)
+			assert.Equal(t, 2, len(allFiles))
+			assert.Equal(t, int64(5), s.Version())
+
+			table, err = tt.tableFn("snapshot-vacuumed")
+			assert.NoError(t, err)
+			s, err = table.Snapshot()
+			assert.NoError(t, err)
+			verify(s, getDirDataFiles(getTestTableDir("snapshot-vacuumed")), 5)
+		})
 	}
-	verify(s, data2_data3_files, 3)
 
-	table, err = getTestFileTable("snapshot-data2-deleted")
-	assert.NoError(t, err)
-	s, err = table.Snapshot()
-	assert.NoError(t, err)
-	var data3_files []string
-	data2_fileset := mapset.NewSet(data2_files...)
-	for _, f := range getDirDataFiles(getTestTableDir("snapshot-data2-deleted")) {
-		if !data0_data1_fileset.Contains(f) && !data2_fileset.Contains(f) {
-			data3_files = append(data3_files, f)
-		}
-	}
-	verify(s, data3_files, 4)
-
-	table, err = getTestFileTable("snapshot-repartitioned")
-	assert.NoError(t, err)
-	s, err = table.Snapshot()
-	assert.NoError(t, err)
-	allFiles, err := s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(allFiles))
-	assert.Equal(t, int64(5), s.Version())
-
-	table, err = getTestFileTable("snapshot-vacuumed")
-	assert.NoError(t, err)
-	s, err = table.Snapshot()
-	assert.NoError(t, err)
-	verify(s, getDirDataFiles(getTestTableDir("snapshot-vacuumed")), 5)
 }
 
 func TestLog_checkpoint(t *testing.T) {
