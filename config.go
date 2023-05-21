@@ -11,7 +11,8 @@ import (
 )
 
 type Config struct {
-	StorageConfig StorageConfig
+	//StorageConfig StorageConfig
+	StoreType string
 }
 
 // DeltaConfig
@@ -111,25 +112,4 @@ func mergeGlobalTableConfigurations(confs tableConfigurations, tableConf map[str
 		}
 	}
 	return res
-}
-
-// StorageConfig
-type StorageScheme string
-
-const (
-	Local     StorageScheme = "file"
-	AzureBlob StorageScheme = "azblob"
-)
-
-type StorageConfig struct {
-	Scheme StorageScheme
-	//DataPath string
-	LogDir string
-
-	// Azure blob config
-	AzureBlobContainer string
-	AzureConnStr       string
-	AzureLocalEmulate  bool
-	AzureBlobDomain    string
-	AzureBlobProtocol  string
 }

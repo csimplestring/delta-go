@@ -97,7 +97,7 @@ func (s *scanFileIterator) findNextValid() (mo.Option[*action.AddFile], error) {
 
 		switch a := tuple.act.(type) {
 		case *action.AddFile:
-			canonicalPath, err := path.Canonicalize(a.Path, string(s.config.StorageConfig.Scheme))
+			canonicalPath, err := path.Canonicalize(a.Path, s.config.StoreType)
 			if err != nil {
 				return mo.None[*action.AddFile](), err
 			}
@@ -117,7 +117,7 @@ func (s *scanFileIterator) findNextValid() (mo.Option[*action.AddFile], error) {
 
 		case *action.RemoveFile:
 			if !isCheckpoint {
-				canonicalPath, err := path.Canonicalize(a.Path, string(s.config.StorageConfig.Scheme))
+				canonicalPath, err := path.Canonicalize(a.Path, s.config.StoreType)
 				if err != nil {
 					return mo.None[*action.AddFile](), err
 				}

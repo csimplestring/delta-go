@@ -263,7 +263,7 @@ func (s *snapshotImp) loadInMemory(files []string) ([]*action.SingleAction, erro
 }
 
 func (s *snapshotImp) loadState() (*snapshotState, error) {
-	replay := NewInMemoryLogReplayer(s.minFileRetentionTimestamp, s.config.StorageConfig)
+	replay := NewInMemoryLogReplayer(s.minFileRetentionTimestamp, s.config.StoreType)
 	singleActions, err := s.loadInMemory(s.files())
 	if err != nil {
 		return nil, err

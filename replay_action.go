@@ -10,7 +10,7 @@ import (
 )
 
 type InMemoryLogReplay struct {
-	storageConfig             StorageConfig
+	storageType               string
 	MinFileRetentionTimestamp int64
 
 	currentProtocolVersion *action.Protocol
@@ -24,10 +24,10 @@ type InMemoryLogReplay struct {
 	tombstones             map[string]*action.RemoveFile
 }
 
-func NewInMemoryLogReplayer(minFileRetentionTimestamp int64, storageConfig StorageConfig) *InMemoryLogReplay {
+func NewInMemoryLogReplayer(minFileRetentionTimestamp int64, storageType string) *InMemoryLogReplay {
 	return &InMemoryLogReplay{
 		MinFileRetentionTimestamp: minFileRetentionTimestamp,
-		storageConfig:             storageConfig,
+		storageType:               storageType,
 		transactions:              make(map[string]*action.SetTransaction),
 		activeFiles:               make(map[string]*action.AddFile),
 		tombstones:                make(map[string]*action.RemoveFile),
@@ -88,7 +88,7 @@ func (r *InMemoryLogReplay) Append(version int64, iter iter.Iter[action.Action])
 			r.numProtocol += 1
 		case *action.AddFile:
 
-			canonicalPath, err := path.Canonicalize(v.Path, string(r.storageConfig.Scheme))
+			canonicalPath, err := path.Canonicalize(v.Path, r.storageType)
 			if err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ func (r *InMemoryLogReplay) Append(version int64, iter iter.Iter[action.Action])
 			delete(r.tombstones, canonicalPath)
 			r.sizeInBytes += canonicalizedAdd.Size
 		case *action.RemoveFile:
-			canonicalPath, err := path.Canonicalize(v.Path, string(r.storageConfig.Scheme))
+			canonicalPath, err := path.Canonicalize(v.Path, r.storageType)
 			if err != nil {
 				return err
 			}

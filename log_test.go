@@ -46,10 +46,7 @@ func getTestTableDir(name string) string {
 
 func getTestConfig() Config {
 	return Config{
-		StorageConfig: StorageConfig{
-			Scheme: Local,
-			LogDir: "",
-		},
+		StoreType: "file",
 	}
 }
 
