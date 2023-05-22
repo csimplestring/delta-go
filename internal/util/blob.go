@@ -1,9 +1,9 @@
-package deltago
+package util
 
 import (
 	"context"
 	"fmt"
-	"log"
+	"strings"
 
 	"io"
 	"math/rand"
@@ -11,12 +11,10 @@ import (
 	"gocloud.dev/blob"
 )
 
-type DataTestUtil struct {
-}
-
-func CopyDir(urlstr string, prefix string) (string, error) {
+func CopyBlobDir(urlstr string, prefix string) (string, error) {
 
 	ctx := context.Background()
+
 	b, err := blob.OpenBucket(ctx, urlstr)
 	if err != nil {
 		return "", err
@@ -35,9 +33,12 @@ func CopyDir(urlstr string, prefix string) (string, error) {
 			return "", err
 		}
 
+		if strings.HasSuffix(obj.Key, "/") {
+			continue
+		}
+
 		dstKey := dir + "-" + obj.Key
 
-		log.Println("copying from " + obj.Key + " to " + dstKey)
 		err = b.Copy(ctx, dstKey, obj.Key, nil)
 		if err != nil {
 			return "", err
@@ -47,7 +48,7 @@ func CopyDir(urlstr string, prefix string) (string, error) {
 	return dir + "-" + prefix, nil
 }
 
-func DelFiles(urlstr string, dir string) error {
+func DelBlobFiles(urlstr string, dir string) error {
 	ctx := context.Background()
 	b, err := blob.OpenBucket(ctx, urlstr)
 	if err != nil {
@@ -66,19 +67,9 @@ func DelFiles(urlstr string, dir string) error {
 			return err
 		}
 
-		log.Println("deleting " + obj.Key)
 		if err := b.Delete(ctx, obj.Key); err != nil {
 			return err
 		}
-	}
-
-	log.Println("deleting " + dir + "/_delta_log")
-	if err := b.Delete(ctx, dir+"/_delta_log"); err != nil {
-		return err
-	}
-	log.Println("deleting " + dir)
-	if err := b.Delete(ctx, dir); err != nil {
-		return err
 	}
 
 	return nil

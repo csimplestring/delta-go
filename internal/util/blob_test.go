@@ -1,4 +1,4 @@
-package deltago
+package util
 
 import (
 	"fmt"
@@ -15,9 +15,9 @@ func Test_LocalCopyDir(t *testing.T) {
 	assert.NoError(t, err)
 	urlstr := fmt.Sprintf("file://%s?metadata=skip", path)
 
-	dir, err := CopyDir(urlstr, "checkpoint")
+	dir, err := CopyBlobDir(urlstr, "checkpoint")
 	assert.NoError(t, err)
 
-	err = DelFiles(urlstr, dir)
+	err = DelBlobFiles(urlstr, dir)
 	assert.NoError(t, err)
 }

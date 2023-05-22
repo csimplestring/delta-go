@@ -15,6 +15,7 @@ import (
 	"github.com/barweiss/go-tuple"
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
+	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
 	"github.com/csimplestring/delta-go/iter"
 	"github.com/csimplestring/delta-go/op"
@@ -35,6 +36,14 @@ func getTestTableDir(name string) string {
 	return "file://" + path + "/"
 }
 
+func getTestFileBaseDir() string {
+	path, err := filepath.Abs(fmt.Sprintf("./tests/golden"))
+	if err != nil {
+		panic(err)
+	}
+	return "file://" + path
+}
+
 func getTestFileConfig() Config {
 	return Config{
 		StoreType: "file",
@@ -52,6 +61,13 @@ func getTestAzBlobDir(name string) string {
 	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
 
 	return fmt.Sprintf("azblob://golden?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", name)
+}
+
+func getTestAzBlobBaseDir() string {
+	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
+	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
+
+	return fmt.Sprintf("azblob://golden?localemu=true&domain=localhost:10000&protocol=http")
 }
 
 func getTestAzBlobConfig() Config {
@@ -253,26 +269,40 @@ func TestLog_checkpoint(t *testing.T) {
 }
 
 func TestLog_updateDeletedDir(t *testing.T) {
-	srcTableDir := getTestTableDir("update-deleted-directory")
-	srcTableDir = strings.TrimPrefix(srcTableDir, "file://")
-	destTableDir, err := os.MkdirTemp(os.TempDir(), "deltago")
-	assert.NoError(t, err)
-	defer os.RemoveAll(destTableDir)
 
-	err = copy.Copy(srcTableDir, destTableDir)
-	assert.NoError(t, err)
+	tests := []struct {
+		name    string
+		baseDir func() string
+	}{
+		{
+			"file table",
+			getTestFileBaseDir,
+		},
+		{
+			"az blob table",
+			getTestAzBlobBaseDir,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDir := tt.baseDir()
+			dir, err := util.CopyBlobDir(baseDir, "update-deleted-directory")
+			assert.NoError(t, err)
+			defer util.DelBlobFiles(baseDir, dir)
 
-	table, err := ForTable("file://"+destTableDir,
-		getTestFileConfig(),
-		&SystemClock{})
-	assert.NoError(t, err)
+			table, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
 
-	err = os.RemoveAll(destTableDir)
-	assert.NoError(t, err)
+			err = util.DelBlobFiles(baseDir, dir)
+			assert.NoError(t, err)
 
-	s, err := table.Update()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(-1), s.Version())
+			s, err := table.Update()
+			assert.NoError(t, err)
+			assert.Equal(t, int64(-1), s.Version())
+		})
+	}
 }
 
 func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *testing.T) {

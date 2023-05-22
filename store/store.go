@@ -82,5 +82,5 @@ func New(path string) (Store, error) {
 		return NewAzureBlobLogStore(path)
 	}
 
-	return nil, errno.UnsupportedFileSystem(path)
+	return nil, errno.UnsupportedFileSystem("unsupported schema " + path + " to create log store")
 }
