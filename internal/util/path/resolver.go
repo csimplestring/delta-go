@@ -72,7 +72,7 @@ func Canonicalize(path string, schema string) (string, error) {
 		return azblobCanonicalize(path)
 	}
 
-	return "", errno.UnsupportedFileSystem("the file schema " + schema + " is not supported")
+	return "", eris.Wrap(errno.UnsupportedFileSystem("unsupported schema to canonicalize"), schema)
 }
 
 func unixCanonicalize(p string) (string, error) {
