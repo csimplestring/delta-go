@@ -39,9 +39,9 @@ type timeTravelFixture struct {
 
 func newTimeTravelFixture() *timeTravelFixture {
 
-	v0 := getTestDirDataFile(getTestTableDir("time-travel-start"))
-	v1 := getTestDirDataFile(getTestTableDir("time-travel-start-start20"))
-	v2 := getTestDirDataFile(getTestTableDir("time-travel-start-start20-start40"))
+	v0 := getTestDirDataFile(getTestFileDir("time-travel-start"))
+	v1 := getTestDirDataFile(getTestFileDir("time-travel-start-start20"))
+	v2 := getTestDirDataFile(getTestFileDir("time-travel-start-start20-start40"))
 
 	return &timeTravelFixture{
 		start:             1540415658000,
@@ -66,7 +66,7 @@ func (f *timeTravelFixture) verifyTimeTravelSnapshot(t *testing.T, s Snapshot, e
 }
 
 func TestLog_time_travel_versionAsOf(t *testing.T) {
-	srcTableDir := getTestTableDir("time-travel-start-start20-start40")
+	srcTableDir := getTestFileDir("time-travel-start-start20-start40")
 	srcTableDir = strings.TrimPrefix(srcTableDir, "file://")
 	destTableDir, err := os.MkdirTemp("", "deltago")
 	assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestLog_time_travel_versionAsOf(t *testing.T) {
 func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_before_timestamp(t *testing.T) {
 	f := newTimeTravelFixture()
 
-	tablePath := getTestTableDir("time-travel-start-start20-start40")
+	tablePath := getTestFileDir("time-travel-start-start20-start40")
 	logDir := strings.TrimPrefix(tablePath, "file://") + "_delta_log/"
 	err := os.Chtimes(logDir+"00000000000000000000.json", time.Now(), time.UnixMilli(f.start))
 	assert.NoError(t, err)
@@ -135,7 +135,7 @@ func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_b
 func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testing.T) {
 	f := newTimeTravelFixture()
 
-	tablePath := getTestTableDir("time-travel-start-start20-start40")
+	tablePath := getTestFileDir("time-travel-start-start20-start40")
 	logDir := strings.TrimPrefix(tablePath, "file://") + "_delta_log/"
 	err := os.Chtimes(logDir+"00000000000000000000.json", time.Now(), time.UnixMilli(f.start))
 	assert.NoError(t, err)
@@ -157,7 +157,7 @@ func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testi
 func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T) {
 	f := newTimeTravelFixture()
 
-	tablePath := getTestTableDir("time-travel-start-start20-start40")
+	tablePath := getTestFileDir("time-travel-start-start20-start40")
 	logDir := strings.TrimPrefix(tablePath, "file://") + "_delta_log/"
 	err := os.Chtimes(logDir+"00000000000000000000.json", time.Now(), time.UnixMilli(f.start))
 	assert.NoError(t, err)
@@ -183,7 +183,7 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 }
 
 func TestLog_time_travel_with_schema_changes_should_instantiate_old_schema(t *testing.T) {
-	tablePath := getTestTableDir("time-travel-schema-changes-a")
+	tablePath := getTestFileDir("time-travel-schema-changes-a")
 	orig_schema_data_files := getTestDirDataFile(tablePath)
 
 	log, err := getTestFileTable("time-travel-schema-changes-b")
@@ -216,7 +216,7 @@ func TestLog_time_travel_with_partition_changes_should_instantiate_old_schema(t 
 	}
 
 	// write data to a table with some original partition
-	tablePath := getTestTableDir("time-travel-partition-changes-a")
+	tablePath := getTestFileDir("time-travel-partition-changes-a")
 	orig_partition_data_files := getPartitionDirDataFiles(strings.TrimPrefix(tablePath, "file://"))
 
 	// then append more data to that "same" table using a different partition

@@ -27,7 +27,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getTestTableDir(name string) string {
+// File log store tests
+
+func getTestFileDir(name string) string {
 	path, err := filepath.Abs(fmt.Sprintf("./tests/golden/%s/", name))
 	if err != nil {
 		panic(err)
@@ -51,10 +53,12 @@ func getTestFileConfig() Config {
 }
 
 func getTestFileTable(name string) (Log, error) {
-	return ForTable(getTestTableDir(name),
+	return ForTable(getTestFileDir(name),
 		getTestFileConfig(),
 		&SystemClock{})
 }
+
+// Azure Blob log store tests
 
 func getTestAzBlobDir(name string) string {
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
@@ -145,14 +149,14 @@ func TestLog_snapshot(t *testing.T) {
 			assert.NoError(t, err)
 			s, err := table.Snapshot()
 			assert.NoError(t, err)
-			data0_files := getDirDataFiles(getTestTableDir("snapshot-data0"))
+			data0_files := getDirDataFiles(getTestFileDir("snapshot-data0"))
 			verify(s, data0_files, 0)
 
 			table, err = tt.tableFn("snapshot-data1")
 			assert.NoError(t, err)
 			s, err = table.Snapshot()
 			assert.NoError(t, err)
-			data0_data1_files := getDirDataFiles(getTestTableDir("snapshot-data1"))
+			data0_data1_files := getDirDataFiles(getTestFileDir("snapshot-data1"))
 			verify(s, data0_data1_files, 1)
 
 			table, err = tt.tableFn("snapshot-data2")
@@ -162,7 +166,7 @@ func TestLog_snapshot(t *testing.T) {
 			var data2_files []string
 			data0_data1_fileset := mapset.NewSet(data0_data1_files...)
 			// we have overwritten files for data0 & data1; only data2 files should remain
-			for _, f := range getDirDataFiles(getTestTableDir("snapshot-data2")) {
+			for _, f := range getDirDataFiles(getTestFileDir("snapshot-data2")) {
 				if !data0_data1_fileset.Contains(f) {
 					data2_files = append(data2_files, f)
 				}
@@ -174,7 +178,7 @@ func TestLog_snapshot(t *testing.T) {
 			s, err = table.Snapshot()
 			assert.NoError(t, err)
 			var data2_data3_files []string
-			for _, f := range getDirDataFiles(getTestTableDir("snapshot-data3")) {
+			for _, f := range getDirDataFiles(getTestFileDir("snapshot-data3")) {
 				if !data0_data1_fileset.Contains(f) {
 					data2_data3_files = append(data2_data3_files, f)
 				}
@@ -187,7 +191,7 @@ func TestLog_snapshot(t *testing.T) {
 			assert.NoError(t, err)
 			var data3_files []string
 			data2_fileset := mapset.NewSet(data2_files...)
-			for _, f := range getDirDataFiles(getTestTableDir("snapshot-data2-deleted")) {
+			for _, f := range getDirDataFiles(getTestFileDir("snapshot-data2-deleted")) {
 				if !data0_data1_fileset.Contains(f) && !data2_fileset.Contains(f) {
 					data3_files = append(data3_files, f)
 				}
@@ -207,7 +211,7 @@ func TestLog_snapshot(t *testing.T) {
 			assert.NoError(t, err)
 			s, err = table.Snapshot()
 			assert.NoError(t, err)
-			verify(s, getDirDataFiles(getTestTableDir("snapshot-vacuumed")), 5)
+			verify(s, getDirDataFiles(getTestFileDir("snapshot-vacuumed")), 5)
 		})
 	}
 
@@ -384,7 +388,7 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 }
 
 func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
-	srcTableDir := getTestTableDir("corrupted-last-checkpoint")
+	srcTableDir := getTestFileDir("corrupted-last-checkpoint")
 	srcTableDir = strings.TrimPrefix(srcTableDir, "file://")
 	destTableDir, err := os.MkdirTemp(os.TempDir(), "deltago")
 	assert.NoError(t, err)
@@ -421,7 +425,7 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 }
 
 func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
-	dataPath := getTestTableDir("canonicalized-paths-normal-a")
+	dataPath := getTestFileDir("canonicalized-paths-normal-a")
 	log, err := ForTable(dataPath, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
@@ -433,7 +437,7 @@ func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 
-	dataPath = getTestTableDir("canonicalized-paths-normal-b")
+	dataPath = getTestFileDir("canonicalized-paths-normal-b")
 	log, err = ForTable(dataPath, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
@@ -447,7 +451,7 @@ func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
 }
 
 func TestLog_paths_should_be_canonicalized_special_characters(t *testing.T) {
-	dataPath := getTestTableDir("canonicalized-paths-special-a")
+	dataPath := getTestFileDir("canonicalized-paths-special-a")
 	log, err := ForTable(dataPath, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
@@ -459,7 +463,7 @@ func TestLog_paths_should_be_canonicalized_special_characters(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 
-	dataPath = getTestTableDir("canonicalized-paths-special-b")
+	dataPath = getTestFileDir("canonicalized-paths-special-b")
 	log, err = ForTable(dataPath, getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
@@ -516,7 +520,7 @@ func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
 }
 
 func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing.T) {
-	log, err := ForTable(getTestTableDir("delete-re-add-same-file-different-transactions"), getTestFileConfig(), &SystemClock{})
+	log, err := ForTable(getTestFileDir("delete-re-add-same-file-different-transactions"), getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
 	s, err := log.Snapshot()
@@ -533,31 +537,31 @@ func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing
 }
 
 func TestLog_version_not_continuous(t *testing.T) {
-	_, err := ForTable(getTestTableDir("versions-not-contiguous"), getTestFileConfig(), &SystemClock{})
+	_, err := ForTable(getTestFileDir("versions-not-contiguous"), getTestFileConfig(), &SystemClock{})
 	assert.ErrorIs(t, err, errno.DeltaVersionNotContinuous([]int64{0, 2}))
 }
 
 func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
 	for _, name := range []string{"protocol", "metadata"} {
-		_, err := ForTable(getTestTableDir(fmt.Sprintf("deltalog-state-reconstruction-without-%s", name)), getTestFileConfig(), &SystemClock{})
+		_, err := ForTable(getTestFileDir(fmt.Sprintf("deltalog-state-reconstruction-without-%s", name)), getTestFileConfig(), &SystemClock{})
 		assert.ErrorIs(t, err, errno.ActionNotFound(name, 0))
 	}
 }
 
 func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fail(t *testing.T) {
 	for _, name := range []string{"protocol", "metadata"} {
-		_, err := ForTable(getTestTableDir(fmt.Sprintf("deltalog-state-reconstruction-from-checkpoint-missing-%s", name)), getTestFileConfig(), &SystemClock{})
+		_, err := ForTable(getTestFileDir(fmt.Sprintf("deltalog-state-reconstruction-from-checkpoint-missing-%s", name)), getTestFileConfig(), &SystemClock{})
 		assert.ErrorIs(t, err, errno.ActionNotFound(name, 10))
 	}
 }
 
 func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(t *testing.T) {
-	_, err := ForTable(getTestTableDir("deltalog-invalid-protocol-version"), getTestFileConfig(), &SystemClock{})
+	_, err := ForTable(getTestFileDir("deltalog-invalid-protocol-version"), getTestFileConfig(), &SystemClock{})
 	assert.ErrorIs(t, err, errno.InvalidProtocolVersionError())
 }
 
 func TestLog_get_commit_info(t *testing.T) {
-	log, err := ForTable(getTestTableDir("deltalog-commit-info"), getTestFileConfig(), &SystemClock{})
+	log, err := ForTable(getTestFileDir("deltalog-commit-info"), getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
 	ci, err := log.CommitInfoAt(0)
@@ -578,7 +582,7 @@ func TestLog_get_commit_info(t *testing.T) {
 	assert.Equal(t, "foo", *ci.UserMetadata)
 
 	// use an actual spark transaction example
-	log, err = ForTable(getTestTableDir("snapshot-vacuumed"), getTestFileConfig(), &SystemClock{})
+	log, err = ForTable(getTestFileDir("snapshot-vacuumed"), getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 	for i := 0; i <= 5; i++ {
 		ci, err = log.CommitInfoAt(int64(i))
@@ -630,7 +634,7 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 		}
 	}
 
-	log, err := ForTable(getTestTableDir("deltalog-getChanges"), getTestFileConfig(), &SystemClock{})
+	log, err := ForTable(getTestFileDir("deltalog-getChanges"), getTestFileConfig(), &SystemClock{})
 	assert.NoError(t, err)
 
 	// standard cases
@@ -650,7 +654,7 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 }
 
 func TestLog_getChanges_data_loss(t *testing.T) {
-	tablePath := getTestTableDir("deltalog-getChanges")
+	tablePath := getTestFileDir("deltalog-getChanges")
 	tempDir, err := os.MkdirTemp("", "delta")
 	assert.NoError(t, err)
 	defer os.RemoveAll(tempDir)
