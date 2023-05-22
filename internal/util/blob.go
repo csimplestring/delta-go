@@ -72,5 +72,30 @@ func DelBlobFiles(urlstr string, dir string) error {
 		}
 	}
 
+	if strings.HasPrefix(urlstr, "file://") {
+		if err := b.Delete(ctx, dir+"/_delta_log"); err != nil {
+			return err
+		}
+		if err := b.Delete(ctx, dir); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func CreateDir(urlstr string) (string, error) {
+	ctx := context.Background()
+	b, err := blob.OpenBucket(ctx, urlstr)
+	if err != nil {
+		return "", err
+	}
+
+	dir := fmt.Sprintf("temp-%d", rand.Int())
+	err = b.WriteAll(context.Background(), dir, []byte{}, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return dir, nil
 }
