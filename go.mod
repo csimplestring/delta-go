@@ -14,7 +14,7 @@ require (
 	github.com/rotisserie/eris v0.5.4
 	github.com/samber/mo v1.8.0
 	github.com/shopspring/decimal v1.3.1
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6
 	github.com/xhit/go-str2duration/v2 v2.1.0
 )
