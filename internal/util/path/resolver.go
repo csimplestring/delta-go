@@ -30,6 +30,8 @@ func Relative(base string, path string) (string, error) {
 
 	if p.Scheme == "file" || (len(p.Scheme) == 0 && strings.HasPrefix(base, "/")) {
 		return unixRelative(base, path)
+	} else if p.Scheme == "azblob" {
+		return azureBlobRelative(base, path)
 	}
 	return "", eris.New(fmt.Sprintf("unsupported scheme %s", p.Scheme))
 }
@@ -62,6 +64,12 @@ func unixRelative(base string, path string) (string, error) {
 	}
 	// absolute path is unaltered and made fully qualified when not in table path
 	return rel, nil
+}
+
+// for azblob file, return as it is. Since we do not support reading/writing data file,
+// we leave this to the caller of this lib to decide how to handle the file path in logs.
+func azureBlobRelative(base string, path string) (string, error) {
+	return path, nil
 }
 
 func Canonicalize(path string, schema string) (string, error) {
