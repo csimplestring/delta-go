@@ -406,40 +406,53 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 }
 
 func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
-	srcTableDir := getTestFileDir("corrupted-last-checkpoint")
-	srcTableDir = strings.TrimPrefix(srcTableDir, "file://")
-	destTableDir, err := os.MkdirTemp(os.TempDir(), "deltago")
-	assert.NoError(t, err)
-	defer os.RemoveAll(destTableDir)
+	tests := []struct {
+		name    string
+		baseDir func() string
+	}{
+		{
+			"file table",
+			getTestFileBaseDir,
+		},
+		{
+			"az blob table",
+			getTestAzBlobBaseDir,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDir := tt.baseDir()
+			dir, err := util.CopyBlobDir(baseDir, "corrupted-last-checkpoint")
+			assert.NoError(t, err)
+			defer util.DelBlobFiles(baseDir, dir)
 
-	err = copy.Copy(srcTableDir, destTableDir)
-	assert.NoError(t, err)
+			table, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
 
-	table, err := ForTable("file://"+destTableDir,
-		getTestFileConfig(),
-		&SystemClock{})
-	assert.NoError(t, err)
+			logImpl1 := table.(*logImpl)
+			lc, err := LastCheckpoint(logImpl1.store)
+			assert.NoError(t, err)
+			assert.True(t, lc.IsPresent())
 
-	logImpl1 := table.(*logImpl)
-	lc, err := LastCheckpoint(logImpl1.store)
-	assert.NoError(t, err)
-	assert.True(t, lc.IsPresent())
+			lastcheckpoint1 := lc.MustGet()
 
-	lastcheckpoint1 := lc.MustGet()
+			err = logImpl1.store.Create(logImpl1.logPath + LastCheckpointPath)
+			assert.NoError(t, err)
 
-	err = logImpl1.store.Create(logImpl1.logPath + LastCheckpointPath)
-	assert.NoError(t, err)
+			table2, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
 
-	table2, err := ForTable("file://"+destTableDir,
-		getTestFileConfig(),
-		&SystemClock{})
-	assert.NoError(t, err)
+			lc2, err := LastCheckpoint(table2.(*logImpl).store)
+			lastcheckpoint2 := lc2.MustGet()
 
-	lc2, err := LastCheckpoint(table2.(*logImpl).store)
-	lastcheckpoint2 := lc2.MustGet()
-
-	assert.NoError(t, err)
-	assert.Equal(t, FromMetadata(*lastcheckpoint2), FromMetadata(*lastcheckpoint1))
+			assert.NoError(t, err)
+			assert.Equal(t, FromMetadata(*lastcheckpoint2), FromMetadata(*lastcheckpoint1))
+		})
+	}
 }
 
 func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
