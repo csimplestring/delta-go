@@ -3,6 +3,8 @@ package util
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"os"
 	"strings"
 
 	"io"
@@ -73,12 +75,12 @@ func DelBlobFiles(urlstr string, dir string) error {
 	}
 
 	if strings.HasPrefix(urlstr, "file://") {
-		if err := b.Delete(ctx, dir+"/_delta_log"); err != nil {
+		p, err := url.Parse(urlstr)
+		if err != nil {
 			return err
 		}
-		if err := b.Delete(ctx, dir); err != nil {
-			return err
-		}
+		fullDir := p.Path + "/" + dir
+		return os.RemoveAll(fullDir)
 	}
 
 	return nil
@@ -91,8 +93,9 @@ func CreateDir(urlstr string) (string, error) {
 		return "", err
 	}
 
-	dir := fmt.Sprintf("temp-%d", rand.Int())
-	err = b.WriteAll(context.Background(), dir, []byte{}, nil)
+	dir := fmt.Sprintf("temp-%d/", rand.Int())
+	key := dir + ".xxx"
+	err = b.WriteAll(context.Background(), key, []byte{}, nil)
 	if err != nil {
 		return "", err
 	}
