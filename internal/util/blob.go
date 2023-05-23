@@ -13,6 +13,36 @@ import (
 	"gocloud.dev/blob"
 )
 
+func listingBlob(ctx context.Context, b *blob.Bucket, prefix string) ([]string, error) {
+	iter := b.List(&blob.ListOptions{
+		Prefix:    prefix,
+		Delimiter: "/",
+	})
+
+	var res []string
+	for {
+		obj, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		if obj.IsDir {
+			if ret, err := listingBlob(ctx, b, obj.Key); err != nil {
+				return nil, err
+			} else {
+				res = append(res, ret...)
+			}
+		} else {
+			res = append(res, obj.Key)
+		}
+	}
+
+	return res, nil
+}
+
 func CopyBlobDir(urlstr string, prefix string) (string, error) {
 
 	ctx := context.Background()
@@ -21,33 +51,23 @@ func CopyBlobDir(urlstr string, prefix string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer b.Close()
 
-	dir := fmt.Sprintf("temp-test-xxx-%d", time.Now().Unix())
-	iter := b.List(&blob.ListOptions{
-		Prefix: prefix,
-	})
-	for {
-		obj, err := iter.Next(ctx)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
+	dir := fmt.Sprintf("temp-%s-xxx-%d", prefix, time.Now().Unix())
 
-		if strings.HasSuffix(obj.Key, "/") {
-			continue
-		}
-
-		dstKey := dir + "-" + obj.Key
-
-		err = b.Copy(ctx, dstKey, obj.Key, nil)
+	blobs, err := listingBlob(ctx, b, prefix)
+	if err != nil {
+		return "", err
+	}
+	for _, srcKey := range blobs {
+		dstKey := dir + "-" + srcKey
+		err = b.Copy(ctx, dstKey, srcKey, nil)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	return dir + "-" + prefix, nil
+	return fmt.Sprintf("%s-%s", dir, prefix), nil
 }
 
 func DelBlobFiles(urlstr string, dir string) error {
