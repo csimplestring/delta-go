@@ -319,10 +319,10 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 		name    string
 		baseDir func() string
 	}{
-		// {
-		// 	"file table",
-		// 	getTestFileBaseDir,
-		// },
+		{
+			"file table",
+			getTestFileBaseDir,
+		},
 		{
 			"az blob table",
 			getTestAzBlobBaseDir,
