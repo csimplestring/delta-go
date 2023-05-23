@@ -6,11 +6,12 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"io"
-	"math/rand"
 
 	"gocloud.dev/blob"
+	"gocloud.dev/gcerrors"
 )
 
 func CopyBlobDir(urlstr string, prefix string) (string, error) {
@@ -22,7 +23,7 @@ func CopyBlobDir(urlstr string, prefix string) (string, error) {
 		return "", err
 	}
 
-	dir := fmt.Sprintf("temp-test-xxx-%d", rand.Int())
+	dir := fmt.Sprintf("temp-test-xxx-%d", time.Now().Unix())
 	iter := b.List(&blob.ListOptions{
 		Prefix: prefix,
 	})
@@ -69,8 +70,14 @@ func DelBlobFiles(urlstr string, dir string) error {
 			return err
 		}
 
-		if err := b.Delete(ctx, obj.Key); err != nil {
-			return err
+		err = b.Delete(ctx, obj.Key)
+		// for blob storage, there is no 'folder', so we skip
+		if err != nil {
+			if gcerrors.Code(err) == gcerrors.NotFound && strings.HasSuffix(obj.Key, "/") {
+				continue
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -93,7 +100,7 @@ func CreateDir(urlstr string) (string, error) {
 		return "", err
 	}
 
-	dir := fmt.Sprintf("temp-%d/", rand.Int())
+	dir := fmt.Sprintf("temp-%d/", time.Now().Unix())
 	key := dir + ".xxx"
 	err = b.WriteAll(context.Background(), key, []byte{}, nil)
 	if err != nil {

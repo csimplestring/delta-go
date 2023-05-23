@@ -43,7 +43,7 @@ func getTestFileBaseDir() string {
 	if err != nil {
 		panic(err)
 	}
-	return "file://" + path
+	return "file://" + path + "?metadata=skip"
 }
 
 func getTestFileConfig() Config {
@@ -294,6 +294,7 @@ func TestLog_updateDeletedDir(t *testing.T) {
 			assert.NoError(t, err)
 			defer util.DelBlobFiles(baseDir, dir)
 
+			// when constructing the url, consider the query string
 			table, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
 				getTestFileConfig(),
 				&SystemClock{})
@@ -314,77 +315,94 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 	manualUpdate := &op.Operation{Name: op.MANUALUPDATE}
 	metadata := getTestMetedata()
 
-	destTableDir, err := os.MkdirTemp(os.TempDir(), "deltago")
-	assert.NoError(t, err)
-	defer os.RemoveAll(destTableDir)
+	tests := []struct {
+		name    string
+		baseDir func() string
+	}{
+		// {
+		// 	"file table",
+		// 	getTestFileBaseDir,
+		// },
+		{
+			"az blob table",
+			getTestAzBlobBaseDir,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-	err = os.Mkdir(destTableDir+"/_delta_log", os.ModePerm)
-	assert.NoError(t, err)
-
-	table1, err := ForTable("file://"+destTableDir,
-		getTestFileConfig(),
-		&SystemClock{})
-	assert.NoError(t, err)
-
-	for i := 1; i <= 5; i++ {
-		txn, err := table1.StartTransaction()
-		assert.NoError(t, err)
-
-		var filesToCommit []action.Action
-		file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
-		if i > 1 {
-			now := time.Now().UnixMilli()
-			delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
-			filesToCommit = append(filesToCommit, delete)
-		}
-
-		filesToCommit = append(filesToCommit, file)
-
-		if i == 1 {
-			err := txn.UpdateMetadata(metadata)
+			baseDir := tt.baseDir()
+			dir, err := util.CreateDir(baseDir)
 			assert.NoError(t, err)
-		}
-		_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
-		assert.NoError(t, err)
+			defer util.DelBlobFiles(baseDir, dir)
+
+			table1, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
+
+			for i := 1; i <= 5; i++ {
+				txn, err := table1.StartTransaction()
+				assert.NoError(t, err)
+
+				var filesToCommit []action.Action
+				file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
+				if i > 1 {
+					now := time.Now().UnixMilli()
+					delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
+					filesToCommit = append(filesToCommit, delete)
+				}
+
+				filesToCommit = append(filesToCommit, file)
+
+				if i == 1 {
+					err := txn.UpdateMetadata(metadata)
+					assert.NoError(t, err)
+				}
+				_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
+				assert.NoError(t, err)
+			}
+
+			table2, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
+
+			for i := 6; i <= 15; i++ {
+				txn, err := table1.StartTransaction()
+				assert.NoError(t, err)
+
+				file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
+				now := time.Now().UnixMilli()
+				delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
+
+				filesToCommit := []action.Action{delete, file}
+
+				_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
+				assert.NoError(t, err)
+			}
+
+			// Since log2 is a separate instance, it shouldn't be updated to version 15
+			s2, err := table2.Snapshot()
+			assert.NoError(t, err)
+			assert.Equal(t, int64(4), s2.Version())
+
+			updatedS2, err := table2.Update()
+			assert.NoError(t, err)
+
+			s1, err := table1.Snapshot()
+			assert.NoError(t, err)
+			assert.Equal(t, s1.Version(), updatedS2.Version(), "Did not update to correct version")
+
+			deltas := table2.(*logImpl).snapshotReader.snapshot().logSegment.Deltas
+			assert.Equal(t, 4, len(deltas), "Expected 4 files starting at version 11 to 14")
+
+			versions := fp.Map(func(f *store.FileMeta) int64 { return filenames.DeltaVersion(f.Path()) })(deltas)
+			sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
+			assert.Equal(t, []int64{11, 12, 13, 14}, versions, "Received the wrong files for update")
+		})
 	}
 
-	table2, err := ForTable("file://"+destTableDir,
-		getTestFileConfig(),
-		&SystemClock{})
-	assert.NoError(t, err)
-
-	for i := 6; i <= 15; i++ {
-		txn, err := table1.StartTransaction()
-		assert.NoError(t, err)
-
-		file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
-		now := time.Now().UnixMilli()
-		delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
-
-		filesToCommit := []action.Action{delete, file}
-
-		_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
-		assert.NoError(t, err)
-	}
-
-	// Since log2 is a separate instance, it shouldn't be updated to version 15
-	s2, err := table2.Snapshot()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(4), s2.Version())
-
-	updatedS2, err := table2.Update()
-	assert.NoError(t, err)
-
-	s1, err := table1.Snapshot()
-	assert.NoError(t, err)
-	assert.Equal(t, s1.Version(), updatedS2.Version(), "Did not update to correct version")
-
-	deltas := table2.(*logImpl).snapshotReader.snapshot().logSegment.Deltas
-	assert.Equal(t, 4, len(deltas), "Expected 4 files starting at version 11 to 14")
-
-	versions := fp.Map(func(f *store.FileMeta) int64 { return filenames.DeltaVersion(f.Path()) })(deltas)
-	sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
-	assert.Equal(t, []int64{11, 12, 13, 14}, versions, "Received the wrong files for update")
 }
 
 func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
