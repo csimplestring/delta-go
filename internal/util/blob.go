@@ -11,7 +11,6 @@ import (
 	"io"
 
 	"gocloud.dev/blob"
-	"gocloud.dev/gcerrors"
 )
 
 func CopyBlobDir(urlstr string, prefix string) (string, error) {
@@ -57,30 +56,9 @@ func DelBlobFiles(urlstr string, dir string) error {
 	if err != nil {
 		return err
 	}
+	defer b.Close()
 
-	iter := b.List(&blob.ListOptions{
-		Prefix: dir,
-	})
-	for {
-		obj, err := iter.Next(ctx)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		err = b.Delete(ctx, obj.Key)
-		// for blob storage, there is no 'folder', so we skip
-		if err != nil {
-			if gcerrors.Code(err) == gcerrors.NotFound && strings.HasSuffix(obj.Key, "/") {
-				continue
-			} else {
-				return err
-			}
-		}
-	}
-
+	// for other cloud storages, we do not delete those temporary files
 	if strings.HasPrefix(urlstr, "file://") {
 		p, err := url.Parse(urlstr)
 		if err != nil {
