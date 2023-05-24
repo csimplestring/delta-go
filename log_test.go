@@ -605,20 +605,38 @@ func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
 }
 
 func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing.T) {
-	log, err := ForTable(getTestFileDir("delete-re-add-same-file-different-transactions"), getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
 
-	s, err := log.Snapshot()
-	assert.NoError(t, err)
-	files, err := s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(files))
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, err := tt.getTable("delete-re-add-same-file-different-transactions")
+			assert.NoError(t, err)
 
-	actualRes := mapset.NewSet(fp.Map(func(a *action.AddFile) string { return a.Path })(files)...)
-	assert.True(t, actualRes.Equal(mapset.NewSet("foo", "bar")))
+			s, err := log.Snapshot()
+			assert.NoError(t, err)
+			files, err := s.AllFiles()
+			assert.NoError(t, err)
+			assert.Equal(t, 2, len(files))
 
-	foo := fp.Filter(func(af *action.AddFile) bool { return af.Path == "foo" })(files)
-	assert.Equal(t, int64(1700000000000), foo[0].ModificationTime)
+			actualRes := mapset.NewSet(fp.Map(func(a *action.AddFile) string { return a.Path })(files)...)
+			assert.True(t, actualRes.Equal(mapset.NewSet("foo", "bar")))
+
+			foo := fp.Filter(func(af *action.AddFile) bool { return af.Path == "foo" })(files)
+			assert.Equal(t, int64(1700000000000), foo[0].ModificationTime)
+		})
+	}
 }
 
 func TestLog_version_not_continuous(t *testing.T) {
