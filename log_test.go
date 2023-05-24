@@ -942,23 +942,55 @@ func TestLog_getChanges_data_loss(t *testing.T) {
 }
 
 func TestLog_table_exists(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "delta")
-	assert.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	t.Parallel()
 
-	log, err := ForTable("file://"+tempDir, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
-	assert.False(t, log.TableExists())
+	tests := []struct {
+		name      string
+		baseDir   func() string
+		getConfig func() Config
+	}{
+		{
+			"file table",
+			getTestFileBaseDir,
+			getTestFileConfig,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobBaseDir,
+			getTestAzBlobConfig,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	trx, err := log.StartTransaction()
-	assert.NoError(t, err)
+			baseDir := tt.baseDir()
+			blobDir, err := util.NewBlobDir(baseDir)
+			assert.NoError(t, err)
+			tempDir, tempFile, err := blobDir.CreateTemp()
+			assert.NoError(t, err)
+			defer func() {
+				assert.NoError(t, blobDir.Delete(tempDir, []string{tempFile}, true))
+				assert.NoError(t, blobDir.Close())
+			}()
 
-	_, err = trx.Commit(iter.FromSlice([]action.Action{
-		getTestMetedata(),
-	}), &op.Operation{Name: op.CREATETABLE}, getTestEngineInfo())
-	assert.NoError(t, err)
+			log, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, tempDir), tt.getConfig(), &SystemClock{})
+			assert.NoError(t, err)
+			assert.False(t, log.TableExists())
 
-	assert.True(t, log.TableExists())
+			trx, err := log.StartTransaction()
+			assert.NoError(t, err)
+
+			_, err = trx.Commit(iter.FromSlice([]action.Action{
+				getTestMetedata(),
+			}), &op.Operation{Name: op.CREATETABLE}, getTestEngineInfo())
+			assert.NoError(t, err)
+
+			assert.True(t, log.TableExists())
+		})
+	}
+
 }
 
 func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
