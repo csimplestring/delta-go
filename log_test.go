@@ -296,8 +296,7 @@ func TestLog_updateDeletedDir(t *testing.T) {
 			dir, files, err := blobDir.Copy("update-deleted-directory")
 			assert.NoError(t, err)
 			defer func() {
-				err := blobDir.Close()
-				assert.NoError(t, err)
+				assert.NoError(t, blobDir.Close())
 			}()
 
 			// when constructing the url, consider the query string
@@ -312,10 +311,6 @@ func TestLog_updateDeletedDir(t *testing.T) {
 			s, err := table.Update()
 			assert.NoError(t, err)
 			assert.Equal(t, int64(-1), s.Version())
-
-			// clean up
-			err = blobDir.Delete(dir, files, true)
-			assert.NoError(t, err)
 		})
 	}
 }
@@ -824,23 +819,40 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 		}
 	}
 
-	log, err := ForTable(getTestFileDir("deltalog-getChanges"), getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, err := tt.getTable("deltalog-getChanges")
+			assert.NoError(t, err)
 
-	// standard cases
-	verifyChanges(log, 0)
-	verifyChanges(log, 1)
-	verifyChanges(log, 2)
+			// standard cases
+			verifyChanges(log, 0)
+			verifyChanges(log, 1)
+			verifyChanges(log, 2)
 
-	// non-existant start version
-	versionLogIter, err := log.Changes(3, false)
-	assert.NoError(t, err)
-	_, err = versionLogIter.Next()
-	assert.ErrorIs(t, err, io.EOF)
+			// non-existant start version
+			versionLogIter, err := log.Changes(3, false)
+			assert.NoError(t, err)
+			_, err = versionLogIter.Next()
+			assert.ErrorIs(t, err, io.EOF)
 
-	// negative start version
-	_, err = log.Changes(-1, false)
-	assert.ErrorIs(t, err, errno.ErrIllegalArgument)
+			// negative start version
+			_, err = log.Changes(-1, false)
+			assert.ErrorIs(t, err, errno.ErrIllegalArgument)
+		})
+	}
 }
 
 func TestLog_getChanges_data_loss(t *testing.T) {
