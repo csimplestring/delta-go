@@ -687,15 +687,50 @@ func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
 }
 
 func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fail(t *testing.T) {
-	for _, name := range []string{"protocol", "metadata"} {
-		_, err := ForTable(getTestFileDir(fmt.Sprintf("deltalog-state-reconstruction-from-checkpoint-missing-%s", name)), getTestFileConfig(), &SystemClock{})
-		assert.ErrorIs(t, err, errno.ActionNotFound(name, 10))
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			for _, name := range []string{"protocol", "metadata"} {
+				_, err := tt.getTable(fmt.Sprintf("deltalog-state-reconstruction-from-checkpoint-missing-%s", name))
+				assert.ErrorIs(t, err, errno.ActionNotFound(name, 10))
+			}
+		})
 	}
 }
 
 func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(t *testing.T) {
-	_, err := ForTable(getTestFileDir("deltalog-invalid-protocol-version"), getTestFileConfig(), &SystemClock{})
-	assert.ErrorIs(t, err, errno.InvalidProtocolVersionError())
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.getTable("deltalog-invalid-protocol-version")
+			assert.ErrorIs(t, err, errno.InvalidProtocolVersionError())
+		})
+	}
 }
 
 func TestLog_get_commit_info(t *testing.T) {
