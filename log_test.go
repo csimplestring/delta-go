@@ -476,29 +476,42 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 }
 
 func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
-	dataPath := getTestFileDir("canonicalized-paths-normal-a")
-	log, err := ForTable(dataPath, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
 
-	s, err := log.Update()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(1), s.Version())
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		// we skip the azure blob here
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, err := tt.getTable("canonicalized-paths-normal-a")
+			assert.NoError(t, err)
 
-	files, err := s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(files))
+			s, err := log.Update()
+			assert.NoError(t, err)
+			assert.Equal(t, int64(1), s.Version())
 
-	dataPath = getTestFileDir("canonicalized-paths-normal-b")
-	log, err = ForTable(dataPath, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
+			files, err := s.AllFiles()
+			assert.NoError(t, err)
+			assert.Equal(t, 0, len(files))
 
-	s, err = log.Update()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(1), s.Version())
+			log, err = tt.getTable("canonicalized-paths-normal-b")
+			assert.NoError(t, err)
 
-	files, err = s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(files))
+			s, err = log.Update()
+			assert.NoError(t, err)
+			assert.Equal(t, int64(1), s.Version())
+
+			files, err = s.AllFiles()
+			assert.NoError(t, err)
+			assert.Equal(t, 0, len(files))
+		})
+	}
 }
 
 func TestLog_paths_should_be_canonicalized_special_characters(t *testing.T) {
