@@ -104,6 +104,7 @@ func getTestMetedata() *action.Metadata {
 }
 
 func TestLog_snapshot(t *testing.T) {
+	t.Parallel()
 	getDirDataFiles := func(tablePath string) []string {
 
 		tablePath = strings.TrimPrefix(tablePath, "file:")
@@ -144,7 +145,10 @@ func TestLog_snapshot(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			table, err := tt.tableFn("snapshot-data0")
 			assert.NoError(t, err)
 			s, err := table.Snapshot()
@@ -218,7 +222,7 @@ func TestLog_snapshot(t *testing.T) {
 }
 
 func TestLog_checkpoint(t *testing.T) {
-
+	t.Parallel()
 	fileTable, err := getTestFileTable("checkpoint")
 	assert.NoError(t, err)
 
@@ -239,7 +243,9 @@ func TestLog_checkpoint(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			snapshot, err := tt.table.Snapshot()
 			assert.NoError(t, err)
 			assert.NotNil(t, snapshot)
@@ -273,7 +279,7 @@ func TestLog_checkpoint(t *testing.T) {
 }
 
 func TestLog_updateDeletedDir(t *testing.T) {
-
+	t.Parallel()
 	tests := []struct {
 		name    string
 		baseDir func() string
@@ -288,7 +294,9 @@ func TestLog_updateDeletedDir(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			root := tt.baseDir()
 			blobDir, err := util.NewBlobDir(root)
 			assert.NoError(t, err)
@@ -316,6 +324,7 @@ func TestLog_updateDeletedDir(t *testing.T) {
 }
 
 func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *testing.T) {
+	t.Parallel()
 	engineInfo := "test-engine-info"
 	manualUpdate := &op.Operation{Name: op.MANUALUPDATE}
 	metadata := getTestMetedata()
@@ -334,8 +343,9 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-
+			t.Parallel()
 			baseDir := tt.baseDir()
 			blobDir, err := util.NewBlobDir(baseDir)
 			assert.NoError(t, err)
@@ -416,6 +426,7 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 }
 
 func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		baseDir func() string
@@ -430,7 +441,9 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			baseDir := tt.baseDir()
 			blobDir, err := util.NewBlobDir(baseDir)
 			assert.NoError(t, err)
@@ -536,7 +549,7 @@ func TestLog_paths_should_be_canonicalized_special_characters(t *testing.T) {
 }
 
 func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
-
+	t.Parallel()
 	tests := []struct {
 		name       string
 		getBaseDir func() string
@@ -551,7 +564,9 @@ func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			baseDir := tt.getBaseDir()
 			blobDir, err := util.NewBlobDir(baseDir)
 			assert.NoError(t, err)
@@ -600,7 +615,7 @@ func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
 }
 
 func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing.T) {
-
+	t.Parallel()
 	tests := []struct {
 		name     string
 		getTable func(string) (Log, error)
@@ -615,7 +630,9 @@ func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			log, err := tt.getTable("delete-re-add-same-file-different-transactions")
 			assert.NoError(t, err)
 
@@ -635,6 +652,7 @@ func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing
 }
 
 func TestLog_version_not_continuous(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		getTable func(string) (Log, error)
@@ -649,7 +667,9 @@ func TestLog_version_not_continuous(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := tt.getTable("versions-not-contiguous")
 			assert.ErrorIs(t, err, errno.DeltaVersionNotContinuous([]int64{0, 2}))
 		})
@@ -657,6 +677,7 @@ func TestLog_version_not_continuous(t *testing.T) {
 }
 
 func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		getTable func(string) (Log, error)
@@ -671,8 +692,9 @@ func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-
+			t.Parallel()
 			for _, name := range []string{"protocol", "metadata"} {
 				_, err := tt.getTable(fmt.Sprintf("deltalog-state-reconstruction-without-%s", name))
 				assert.ErrorIs(t, err, errno.ActionNotFound(name, 0))
@@ -682,6 +704,7 @@ func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
 }
 
 func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fail(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		getTable func(string) (Log, error)
@@ -696,8 +719,9 @@ func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fai
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-
+			t.Parallel()
 			for _, name := range []string{"protocol", "metadata"} {
 				_, err := tt.getTable(fmt.Sprintf("deltalog-state-reconstruction-from-checkpoint-missing-%s", name))
 				assert.ErrorIs(t, err, errno.ActionNotFound(name, 10))
@@ -707,6 +731,7 @@ func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fai
 }
 
 func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		getTable func(string) (Log, error)
@@ -721,7 +746,9 @@ func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := tt.getTable("deltalog-invalid-protocol-version")
 			assert.ErrorIs(t, err, errno.InvalidProtocolVersionError())
 		})
@@ -729,6 +756,7 @@ func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(
 }
 
 func TestLog_get_commit_info(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		getTable func(string) (Log, error)
@@ -743,7 +771,9 @@ func TestLog_get_commit_info(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			log, err := tt.getTable("deltalog-commit-info")
 			assert.NoError(t, err)
 
@@ -783,7 +813,7 @@ func TestLog_get_commit_info(t *testing.T) {
 }
 
 func TestLog_getChanges_no_data_loss(t *testing.T) {
-
+	t.Parallel()
 	versionToActionsMap := map[int64][]string{
 		0: {"CommitInfo", "Protocol", "Metadata", "AddFile"},
 		1: {"CommitInfo", "AddCDCFile", "RemoveFile"},
@@ -833,7 +863,9 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			log, err := tt.getTable("deltalog-getChanges")
 			assert.NoError(t, err)
 
