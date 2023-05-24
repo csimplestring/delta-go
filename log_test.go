@@ -662,9 +662,27 @@ func TestLog_version_not_continuous(t *testing.T) {
 }
 
 func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
-	for _, name := range []string{"protocol", "metadata"} {
-		_, err := ForTable(getTestFileDir(fmt.Sprintf("deltalog-state-reconstruction-without-%s", name)), getTestFileConfig(), &SystemClock{})
-		assert.ErrorIs(t, err, errno.ActionNotFound(name, 0))
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			for _, name := range []string{"protocol", "metadata"} {
+				_, err := tt.getTable(fmt.Sprintf("deltalog-state-reconstruction-without-%s", name))
+				assert.ErrorIs(t, err, errno.ActionNotFound(name, 0))
+			}
+		})
 	}
 }
 
