@@ -541,46 +541,67 @@ func TestLog_paths_should_be_canonicalized_special_characters(t *testing.T) {
 }
 
 func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "delta")
-	assert.NoError(t, err)
-	defer os.RemoveAll(tempDir)
 
-	dataPath := "file://" + tempDir
-
-	log, err := ForTable(dataPath, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
-
-	logPath := tempDir + "/_delta_log"
-	assert.DirExists(t, logPath)
-
-	path := tempDir + "/a/b/c"
-
-	now := time.Now().UnixMilli()
-	size := int64(0)
-	metadata := getTestMetedata()
-
-	removeFile := &action.RemoveFile{
-		Path:                 path,
-		DeletionTimestamp:    &now,
-		DataChange:           true,
-		ExtendedFileMetadata: false,
-		PartitionValues:      nil,
-		Size:                 &size,
-		Tags:                 nil,
+	tests := []struct {
+		name       string
+		getBaseDir func() string
+	}{
+		{
+			"file table",
+			getTestFileBaseDir,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobBaseDir,
+		},
 	}
-	actions := iter.FromSlice([]action.Action{removeFile, metadata})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDir := tt.getBaseDir()
+			blobDir, err := util.NewBlobDir(baseDir)
+			assert.NoError(t, err)
 
-	trx, err := log.StartTransaction()
-	assert.NoError(t, err)
+			tempDir, placeHolder, err := blobDir.CreateTemp()
+			assert.NoError(t, err)
+			defer func() {
+				assert.NoError(t, blobDir.Delete(tempDir, []string{placeHolder}, true))
+				assert.NoError(t, blobDir.Close())
+			}()
 
-	_, err = trx.Commit(actions, getTestManualUpdate(), getTestEngineInfo())
-	assert.NoError(t, err)
+			dataPath := fmt.Sprintf("%s&prefix=%s", baseDir, tempDir)
+			log, err := ForTable(dataPath, getTestFileConfig(), &SystemClock{})
+			assert.NoError(t, err)
 
-	s, err := log.Update()
-	assert.NoError(t, err)
-	commitedRemove, err := s.(*snapshotImp).tombstones()
-	assert.NoError(t, err)
-	assert.Equal(t, "file://"+path, commitedRemove[0].Path)
+			path := "schema://" + tempDir + "/a/b/c"
+			now := time.Now().UnixMilli()
+			size := int64(0)
+			metadata := getTestMetedata()
+
+			removeFile := &action.RemoveFile{
+				Path:                 path,
+				DeletionTimestamp:    &now,
+				DataChange:           true,
+				ExtendedFileMetadata: false,
+				PartitionValues:      nil,
+				Size:                 &size,
+				Tags:                 nil,
+			}
+			actions := iter.FromSlice([]action.Action{removeFile, metadata})
+
+			trx, err := log.StartTransaction()
+			assert.NoError(t, err)
+
+			_, err = trx.Commit(actions, getTestManualUpdate(), getTestEngineInfo())
+			assert.NoError(t, err)
+
+			s, err := log.Update()
+			assert.NoError(t, err)
+			commitedRemove, err := s.(*snapshotImp).tombstones()
+			assert.NoError(t, err)
+			assert.Equal(t, path, commitedRemove[0].Path)
+		})
+	}
+
 }
 
 func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing.T) {
