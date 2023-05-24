@@ -640,8 +640,25 @@ func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing
 }
 
 func TestLog_version_not_continuous(t *testing.T) {
-	_, err := ForTable(getTestFileDir("versions-not-contiguous"), getTestFileConfig(), &SystemClock{})
-	assert.ErrorIs(t, err, errno.DeltaVersionNotContinuous([]int64{0, 2}))
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.getTable("versions-not-contiguous")
+			assert.ErrorIs(t, err, errno.DeltaVersionNotContinuous([]int64{0, 2}))
+		})
+	}
 }
 
 func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
