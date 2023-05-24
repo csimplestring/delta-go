@@ -107,17 +107,17 @@ func (a *AzureBlobLogStore) Write(path string, actions iter.Iter[string], overwr
 }
 
 // Resolve the fully qualified path for the given `path`.
-func (a *AzureBlobLogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
-	path = strings.TrimPrefix(path, "azblob://")
-	dir := filepath.Dir(path)
-	base := filepath.Base(path)
+func (a *AzureBlobLogStore) ResolvePathOnPhysicalStore(pathWithoutSchema string) (string, error) {
+	pathWithoutSchema = strings.TrimPrefix(pathWithoutSchema, "azblob://")
+	dir := filepath.Dir(pathWithoutSchema)
+	base := filepath.Base(pathWithoutSchema)
 
 	// relative path
 	if dir == "." {
 		return base, nil
 	}
 
-	if strings.TrimSuffix(a.logDir, "/") != strings.TrimSuffix(dir, "/") {
+	if strings.TrimSuffix(a.logDir, "/") != strings.TrimSuffix("azblob://"+dir, "/") {
 		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", a.logDir, dir)
 	}
 	return base, nil
