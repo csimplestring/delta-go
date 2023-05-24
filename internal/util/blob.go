@@ -13,6 +13,7 @@ import (
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/azureblob"
 	_ "gocloud.dev/blob/fileblob"
+	"gocloud.dev/gcerrors"
 )
 
 type BlobDir struct {
@@ -105,12 +106,20 @@ func (b *BlobDir) Delete(dir string, files []string, hardDelete bool) error {
 		ctx := context.Background()
 		for _, f := range files {
 			if err := b.bucket.Delete(ctx, f); err != nil {
-				return err
+				if gcerrors.NotFound == gcerrors.Code(err) {
+					continue
+				} else {
+					return err
+				}
 			}
 		}
 	}
 
 	return nil
+}
+
+func (b *BlobDir) DeleteFile(file string) error {
+	return b.bucket.Delete(context.Background(), file)
 }
 
 func (b *BlobDir) CreateTemp() (dir string, placeHolder string, err error) {
