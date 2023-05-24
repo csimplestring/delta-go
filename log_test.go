@@ -19,6 +19,7 @@ import (
 	"github.com/csimplestring/delta-go/internal/util/filenames"
 	"github.com/csimplestring/delta-go/iter"
 	"github.com/csimplestring/delta-go/op"
+	"github.com/csimplestring/delta-go/store"
 	"github.com/csimplestring/delta-go/types"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/otiai10/copy"
@@ -294,7 +295,10 @@ func TestLog_updateDeletedDir(t *testing.T) {
 
 			dir, files, err := blobDir.Copy("update-deleted-directory")
 			assert.NoError(t, err)
-			defer blobDir.Delete(dir, files, true)
+			defer func() {
+				err := blobDir.Close()
+				assert.NoError(t, err)
+			}()
 
 			// when constructing the url, consider the query string
 			table, err := ForTable(fmt.Sprintf("%s&prefix=%s", root, dir),
@@ -308,103 +312,112 @@ func TestLog_updateDeletedDir(t *testing.T) {
 			s, err := table.Update()
 			assert.NoError(t, err)
 			assert.Equal(t, int64(-1), s.Version())
+
+			// clean up
+			err = blobDir.Delete(dir, files, true)
+			assert.NoError(t, err)
 		})
 	}
 }
 
 func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *testing.T) {
-	// engineInfo := "test-engine-info"
-	// manualUpdate := &op.Operation{Name: op.MANUALUPDATE}
-	// metadata := getTestMetedata()
+	engineInfo := "test-engine-info"
+	manualUpdate := &op.Operation{Name: op.MANUALUPDATE}
+	metadata := getTestMetedata()
 
-	// tests := []struct {
-	// 	name    string
-	// 	baseDir func() string
-	// }{
-	// 	{
-	// 		"file table",
-	// 		getTestFileBaseDir,
-	// 	},
-	// 	{
-	// 		"az blob table",
-	// 		getTestAzBlobBaseDir,
-	// 	},
-	// }
-	// for _, tt := range tests {
-	// 	t.Run(tt.name, func(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseDir func() string
+	}{
+		{
+			"file table",
+			getTestFileBaseDir,
+		},
+		{
+			"az blob table",
+			getTestAzBlobBaseDir,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-	// 		baseDir := tt.baseDir()
-	// 		dir, err := util.CreateDir(baseDir)
-	// 		assert.NoError(t, err)
-	// 		defer util.DelBlobFiles(baseDir, dir, nil)
+			baseDir := tt.baseDir()
+			blobDir, err := util.NewBlobDir(baseDir)
+			assert.NoError(t, err)
 
-	// 		table1, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
-	// 			getTestFileConfig(),
-	// 			&SystemClock{})
-	// 		assert.NoError(t, err)
+			dir, placeHolder, err := blobDir.CreateTemp()
+			assert.NoError(t, err)
+			defer func() {
+				assert.NoError(t, blobDir.Delete(dir, []string{placeHolder}, true))
+				assert.NoError(t, blobDir.Close())
+			}()
 
-	// 		for i := 1; i <= 5; i++ {
-	// 			txn, err := table1.StartTransaction()
-	// 			assert.NoError(t, err)
+			table1, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
 
-	// 			var filesToCommit []action.Action
-	// 			file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
-	// 			if i > 1 {
-	// 				now := time.Now().UnixMilli()
-	// 				delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
-	// 				filesToCommit = append(filesToCommit, delete)
-	// 			}
+			for i := 1; i <= 5; i++ {
+				txn, err := table1.StartTransaction()
+				assert.NoError(t, err)
 
-	// 			filesToCommit = append(filesToCommit, file)
+				var filesToCommit []action.Action
+				file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
+				if i > 1 {
+					now := time.Now().UnixMilli()
+					delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
+					filesToCommit = append(filesToCommit, delete)
+				}
 
-	// 			if i == 1 {
-	// 				err := txn.UpdateMetadata(metadata)
-	// 				assert.NoError(t, err)
-	// 			}
-	// 			_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
-	// 			assert.NoError(t, err)
-	// 		}
+				filesToCommit = append(filesToCommit, file)
 
-	// 		table2, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
-	// 			getTestFileConfig(),
-	// 			&SystemClock{})
-	// 		assert.NoError(t, err)
+				if i == 1 {
+					err := txn.UpdateMetadata(metadata)
+					assert.NoError(t, err)
+				}
+				_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
+				assert.NoError(t, err)
+			}
 
-	// 		for i := 6; i <= 15; i++ {
-	// 			txn, err := table1.StartTransaction()
-	// 			assert.NoError(t, err)
+			table2, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, dir),
+				getTestFileConfig(),
+				&SystemClock{})
+			assert.NoError(t, err)
 
-	// 			file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
-	// 			now := time.Now().UnixMilli()
-	// 			delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
+			for i := 6; i <= 15; i++ {
+				txn, err := table1.StartTransaction()
+				assert.NoError(t, err)
 
-	// 			filesToCommit := []action.Action{delete, file}
+				file := &action.AddFile{Path: fmt.Sprintf("%d", i), PartitionValues: map[string]string{}, Size: 1, ModificationTime: 1, DataChange: true}
+				now := time.Now().UnixMilli()
+				delete := &action.RemoveFile{Path: fmt.Sprintf("%d", i-1), DeletionTimestamp: &now, DataChange: true}
 
-	// 			_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
-	// 			assert.NoError(t, err)
-	// 		}
+				filesToCommit := []action.Action{delete, file}
 
-	// 		// Since log2 is a separate instance, it shouldn't be updated to version 15
-	// 		s2, err := table2.Snapshot()
-	// 		assert.NoError(t, err)
-	// 		assert.Equal(t, int64(4), s2.Version())
+				_, err = txn.Commit(iter.FromSlice(filesToCommit), manualUpdate, engineInfo)
+				assert.NoError(t, err)
+			}
 
-	// 		updatedS2, err := table2.Update()
-	// 		assert.NoError(t, err)
+			// Since log2 is a separate instance, it shouldn't be updated to version 15
+			s2, err := table2.Snapshot()
+			assert.NoError(t, err)
+			assert.Equal(t, int64(4), s2.Version())
 
-	// 		s1, err := table1.Snapshot()
-	// 		assert.NoError(t, err)
-	// 		assert.Equal(t, s1.Version(), updatedS2.Version(), "Did not update to correct version")
+			updatedS2, err := table2.Update()
+			assert.NoError(t, err)
 
-	// 		deltas := table2.(*logImpl).snapshotReader.snapshot().logSegment.Deltas
-	// 		assert.Equal(t, 4, len(deltas), "Expected 4 files starting at version 11 to 14")
+			s1, err := table1.Snapshot()
+			assert.NoError(t, err)
+			assert.Equal(t, s1.Version(), updatedS2.Version(), "Did not update to correct version")
 
-	// 		versions := fp.Map(func(f *store.FileMeta) int64 { return filenames.DeltaVersion(f.Path()) })(deltas)
-	// 		sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
-	// 		assert.Equal(t, []int64{11, 12, 13, 14}, versions, "Received the wrong files for update")
-	// 	})
-	// }
+			deltas := table2.(*logImpl).snapshotReader.snapshot().logSegment.Deltas
+			assert.Equal(t, 4, len(deltas), "Expected 4 files starting at version 11 to 14")
 
+			versions := fp.Map(func(f *store.FileMeta) int64 { return filenames.DeltaVersion(f.Path()) })(deltas)
+			sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
+			assert.Equal(t, []int64{11, 12, 13, 14}, versions, "Received the wrong files for update")
+		})
+	}
 }
 
 func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
