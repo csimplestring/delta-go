@@ -10,25 +10,30 @@ import (
 	_ "gocloud.dev/blob/fileblob"
 )
 
-func Test_LocalCopyDir(t *testing.T) {
+func Test_LocalBlobDir(t *testing.T) {
+	
 	path, err := filepath.Abs("../../tests/golden/")
 	assert.NoError(t, err)
 	urlstr := fmt.Sprintf("file://%s?metadata=skip", path)
 
-	dir, err := CopyBlobDir(urlstr, "checkpoint")
+	bd, err := NewBlobDir(urlstr)
 	assert.NoError(t, err)
 
-	err = DelBlobFiles(urlstr, dir)
+	// create temp folder
+	tempDir, placeHolder, err := bd.CreateTemp()
 	assert.NoError(t, err)
-}
+	assert.NotEmpty(t, placeHolder)
+	assert.NotEmpty(t, tempDir)
 
-func Test_LocalCreateDir(t *testing.T) {
-	path, err := filepath.Abs("./")
+	// clean up temp folder
+	err = bd.Delete(tempDir, []string{placeHolder}, true)
 	assert.NoError(t, err)
-	urlstr := fmt.Sprintf("file://%s?metadata=skip", path)
 
-	dir, err := CreateDir(urlstr)
+	// copy from a folder
+	newDir, files, err := bd.Copy("checkpoint")
 	assert.NoError(t, err)
-	err = DelBlobFiles(urlstr, dir)
+	assert.Equal(t, 18, len(files))
+
+	err = bd.Delete(newDir, files, true)
 	assert.NoError(t, err)
 }

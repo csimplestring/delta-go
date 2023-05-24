@@ -11,10 +11,29 @@ import (
 	"io"
 
 	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/azureblob"
+	_ "gocloud.dev/blob/fileblob"
 )
 
-func listingBlob(ctx context.Context, b *blob.Bucket, prefix string) ([]string, error) {
-	iter := b.List(&blob.ListOptions{
+type BlobDir struct {
+	bucket *blob.Bucket
+	urlstr string
+}
+
+func NewBlobDir(urlstr string) (*BlobDir, error) {
+	bucket, err := blob.OpenBucket(context.Background(), urlstr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BlobDir{
+		bucket: bucket,
+		urlstr: urlstr,
+	}, nil
+}
+
+func (b *BlobDir) listingBlob(ctx context.Context, prefix string) ([]string, error) {
+	iter := b.bucket.List(&blob.ListOptions{
 		Prefix:    prefix,
 		Delimiter: "/",
 	})
@@ -30,7 +49,7 @@ func listingBlob(ctx context.Context, b *blob.Bucket, prefix string) ([]string, 
 		}
 
 		if obj.IsDir {
-			if ret, err := listingBlob(ctx, b, obj.Key); err != nil {
+			if ret, err := b.listingBlob(ctx, obj.Key); err != nil {
 				return nil, err
 			} else {
 				res = append(res, ret...)
@@ -43,44 +62,38 @@ func listingBlob(ctx context.Context, b *blob.Bucket, prefix string) ([]string, 
 	return res, nil
 }
 
-func CopyBlobDir(urlstr string, prefix string) (string, error) {
-
-	ctx := context.Background()
-
-	b, err := blob.OpenBucket(ctx, urlstr)
-	if err != nil {
-		return "", err
-	}
-	defer b.Close()
-
-	dir := fmt.Sprintf("temp-%s-xxx-%d", prefix, time.Now().Unix())
-
-	blobs, err := listingBlob(ctx, b, prefix)
-	if err != nil {
-		return "", err
-	}
-	for _, srcKey := range blobs {
-		dstKey := dir + "-" + srcKey
-		err = b.Copy(ctx, dstKey, srcKey, nil)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return fmt.Sprintf("%s-%s", dir, prefix), nil
+func (b *BlobDir) Close() error {
+	return b.bucket.Close()
 }
 
-func DelBlobFiles(urlstr string, dir string) error {
-	ctx := context.Background()
-	b, err := blob.OpenBucket(ctx, urlstr)
-	if err != nil {
-		return err
-	}
-	defer b.Close()
+func (b *BlobDir) Copy(srcPrefix string) (string, []string, error) {
 
-	// for other cloud storages, we do not delete those temporary files
-	if strings.HasPrefix(urlstr, "file://") {
-		p, err := url.Parse(urlstr)
+	ctx := context.Background()
+
+	dir := fmt.Sprintf("temp-%s-xxx-%d", srcPrefix, time.Now().Unix())
+
+	blobs, err := b.listingBlob(ctx, srcPrefix)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var tempBlobs []string
+	for _, srcKey := range blobs {
+		dstKey := dir + "-" + srcKey
+		err = b.bucket.Copy(ctx, dstKey, srcKey, nil)
+		if err != nil {
+			return "", nil, err
+		}
+		tempBlobs = append(tempBlobs, dstKey)
+	}
+
+	return fmt.Sprintf("%s-%s", dir, srcPrefix), tempBlobs, nil
+}
+
+func (b *BlobDir) Delete(dir string, files []string, hardDelete bool) error {
+
+	if strings.HasPrefix(b.urlstr, "file://") {
+		p, err := url.Parse(b.urlstr)
 		if err != nil {
 			return err
 		}
@@ -88,22 +101,26 @@ func DelBlobFiles(urlstr string, dir string) error {
 		return os.RemoveAll(fullDir)
 	}
 
+	if hardDelete {
+		ctx := context.Background()
+		for _, f := range files {
+			if err := b.bucket.Delete(ctx, f); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
-func CreateDir(urlstr string) (string, error) {
-	ctx := context.Background()
-	b, err := blob.OpenBucket(ctx, urlstr)
+func (b *BlobDir) CreateTemp() (dir string, placeHolder string, err error) {
+
+	dir = fmt.Sprintf("temp-%d/", time.Now().Unix())
+	placeHolder = dir + ".xxx"
+	err = b.bucket.WriteAll(context.Background(), placeHolder, []byte{}, nil)
 	if err != nil {
-		return "", err
+		return
 	}
 
-	dir := fmt.Sprintf("temp-%d/", time.Now().Unix())
-	key := dir + ".xxx"
-	err = b.WriteAll(context.Background(), key, []byte{}, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return dir, nil
+	return
 }
