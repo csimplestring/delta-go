@@ -734,40 +734,57 @@ func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(
 }
 
 func TestLog_get_commit_info(t *testing.T) {
-	log, err := ForTable(getTestFileDir("deltalog-commit-info"), getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
-
-	ci, err := log.CommitInfoAt(0)
-	assert.NoError(t, err)
-	assert.Equal(t, int64(0), *ci.Version)
-	assert.Equal(t, int64(1540415658000), ci.Timestamp)
-	assert.Equal(t, "user_0", *ci.UserID)
-	assert.Equal(t, "username_0", *ci.UserName)
-	assert.Equal(t, "WRITE", ci.Operation)
-	assert.Equal(t, map[string]string{"test": "test"}, ci.OperationParameters)
-	assert.Equal(t, &action.JobInfo{JobID: "job_id_0", JobName: "job_name_0", RunId: "run_id_0", JobOwnerId: "job_owner_0", TriggerType: "trigger_type_0"}, ci.Job)
-	assert.Equal(t, &action.NotebookInfo{NotebookId: "notebook_id_0"}, ci.Notebook)
-	assert.Equal(t, "cluster_id_0", *ci.ClusterId)
-	assert.Equal(t, int64(-1), *ci.ReadVersion)
-	assert.Equal(t, "default", *ci.IsolationLevel)
-	assert.Equal(t, true, *ci.IsBlindAppend)
-	assert.Equal(t, map[string]string{"test": "test"}, ci.OperationMetrics)
-	assert.Equal(t, "foo", *ci.UserMetadata)
-
-	// use an actual spark transaction example
-	log, err = ForTable(getTestFileDir("snapshot-vacuumed"), getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
-	for i := 0; i <= 5; i++ {
-		ci, err = log.CommitInfoAt(int64(i))
-		assert.NoError(t, err)
-		assert.Equal(t, int64(i), *ci.Version)
-		if i > 0 {
-			assert.Equal(t, int64(i-1), *ci.ReadVersion)
-		}
+	tests := []struct {
+		name     string
+		getTable func(string) (Log, error)
+	}{
+		{
+			"file table",
+			getTestFileTable,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobTable,
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, err := tt.getTable("deltalog-commit-info")
+			assert.NoError(t, err)
 
-	_, err = log.CommitInfoAt(99)
-	assert.Error(t, err)
+			ci, err := log.CommitInfoAt(0)
+			assert.NoError(t, err)
+			assert.Equal(t, int64(0), *ci.Version)
+			assert.Equal(t, int64(1540415658000), ci.Timestamp)
+			assert.Equal(t, "user_0", *ci.UserID)
+			assert.Equal(t, "username_0", *ci.UserName)
+			assert.Equal(t, "WRITE", ci.Operation)
+			assert.Equal(t, map[string]string{"test": "test"}, ci.OperationParameters)
+			assert.Equal(t, &action.JobInfo{JobID: "job_id_0", JobName: "job_name_0", RunId: "run_id_0", JobOwnerId: "job_owner_0", TriggerType: "trigger_type_0"}, ci.Job)
+			assert.Equal(t, &action.NotebookInfo{NotebookId: "notebook_id_0"}, ci.Notebook)
+			assert.Equal(t, "cluster_id_0", *ci.ClusterId)
+			assert.Equal(t, int64(-1), *ci.ReadVersion)
+			assert.Equal(t, "default", *ci.IsolationLevel)
+			assert.Equal(t, true, *ci.IsBlindAppend)
+			assert.Equal(t, map[string]string{"test": "test"}, ci.OperationMetrics)
+			assert.Equal(t, "foo", *ci.UserMetadata)
+
+			// use an actual spark transaction example
+			log, err = tt.getTable("snapshot-vacuumed")
+			assert.NoError(t, err)
+			for i := 0; i <= 5; i++ {
+				ci, err = log.CommitInfoAt(int64(i))
+				assert.NoError(t, err)
+				assert.Equal(t, int64(i), *ci.Version)
+				if i > 0 {
+					assert.Equal(t, int64(i-1), *ci.ReadVersion)
+				}
+			}
+
+			_, err = log.CommitInfoAt(99)
+			assert.Error(t, err)
+		})
+	}
 }
 
 func TestLog_getChanges_no_data_loss(t *testing.T) {
