@@ -22,7 +22,6 @@ import (
 	"github.com/csimplestring/delta-go/store"
 	"github.com/csimplestring/delta-go/types"
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/otiai10/copy"
 	"github.com/repeale/fp-go"
 	"github.com/stretchr/testify/assert"
 )
@@ -888,31 +887,58 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 }
 
 func TestLog_getChanges_data_loss(t *testing.T) {
-	tablePath := getTestFileDir("deltalog-getChanges")
-	tempDir, err := os.MkdirTemp("", "delta")
-	assert.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	t.Parallel()
 
-	err = copy.Copy(strings.TrimPrefix(tablePath, "file://"), tempDir)
-	assert.NoError(t, err)
+	tests := []struct {
+		name      string
+		baseDir   func() string
+		getConfig func() Config
+	}{
+		{
+			"file table",
+			getTestFileBaseDir,
+			getTestFileConfig,
+		},
+		{
+			"azure blob table",
+			getTestAzBlobBaseDir,
+			getTestAzBlobConfig,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	log, err := ForTable("file://"+tempDir, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
+			baseDir := tt.baseDir()
+			blobDir, err := util.NewBlobDir(baseDir)
+			assert.NoError(t, err)
+			tempDir, tempFiles, err := blobDir.Copy("deltalog-getChanges")
+			assert.NoError(t, err)
+			defer func() {
+				assert.NoError(t, blobDir.Delete(tempDir, tempFiles, true))
+				assert.NoError(t, blobDir.Close())
+			}()
 
-	// delete 2 files
-	err = os.Remove(tempDir + "/_delta_log/00000000000000000000.json")
-	assert.NoError(t, err)
-	err = os.Remove(tempDir + "/_delta_log/00000000000000000001.json")
-	assert.NoError(t, err)
+			log, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, tempDir), tt.getConfig(), &SystemClock{})
+			assert.NoError(t, err)
 
-	vlIter, err := log.Changes(0, false)
-	assert.NoError(t, err)
-	versionLogs, err := iter.ToSlice(vlIter)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(versionLogs))
+			// delete 2 files
+			err = blobDir.DeleteFile(tempDir + "/_delta_log/00000000000000000000.json")
+			assert.NoError(t, err)
+			err = blobDir.DeleteFile(tempDir + "/_delta_log/00000000000000000001.json")
+			assert.NoError(t, err)
 
-	_, err = log.Changes(0, true)
-	assert.ErrorIs(t, err, errno.ErrIllegalState)
+			vlIter, err := log.Changes(0, false)
+			assert.NoError(t, err)
+			versionLogs, err := iter.ToSlice(vlIter)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, len(versionLogs))
+
+			_, err = log.Changes(0, true)
+			assert.ErrorIs(t, err, errno.ErrIllegalState)
+		})
+	}
 }
 
 func TestLog_table_exists(t *testing.T) {
