@@ -10,7 +10,6 @@ import (
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	"github.com/otiai10/copy"
 	"github.com/repeale/fp-go"
 	"github.com/stretchr/testify/assert"
 )
@@ -66,46 +65,44 @@ func (f *timeTravelFixture) verifyTimeTravelSnapshot(t *testing.T, s Snapshot, e
 }
 
 func TestLog_time_travel_versionAsOf(t *testing.T) {
-	srcTableDir := getTestFileDir("time-travel-start-start20-start40")
-	srcTableDir = strings.TrimPrefix(srcTableDir, "file://")
-	destTableDir, err := os.MkdirTemp("", "deltago")
-	assert.NoError(t, err)
-	defer os.RemoveAll(destTableDir)
 
-	err = copy.Copy(srcTableDir, destTableDir)
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	log, err := ForTable("file://"+destTableDir, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
+			log, err := tt.copyLog("time-travel-start-start20-start40")
+			assert.NoError(t, err)
 
-	fixture := newTimeTravelFixture()
-	s0, err := log.SnapshotForVersionAsOf(0)
-	assert.NoError(t, err)
-	s1, err := log.SnapshotForVersionAsOf(1)
-	assert.NoError(t, err)
-	s2, err := log.SnapshotForVersionAsOf(2)
-	assert.NoError(t, err)
+			fixture := newTimeTravelFixture()
+			s0, err := log.SnapshotForVersionAsOf(0)
+			assert.NoError(t, err)
+			s1, err := log.SnapshotForVersionAsOf(1)
+			assert.NoError(t, err)
+			s2, err := log.SnapshotForVersionAsOf(2)
+			assert.NoError(t, err)
 
-	// Correct cases
-	fixture.verifyTimeTravelSnapshot(t, s0, fixture.dataFilesVersion0, 0)
-	fixture.verifyTimeTravelSnapshot(t, s1, fixture.dataFilesVersion1, 1)
-	fixture.verifyTimeTravelSnapshot(t, s2, fixture.dataFilesVersion2, 2)
+			// Correct cases
+			fixture.verifyTimeTravelSnapshot(t, s0, fixture.dataFilesVersion0, 0)
+			fixture.verifyTimeTravelSnapshot(t, s1, fixture.dataFilesVersion1, 1)
+			fixture.verifyTimeTravelSnapshot(t, s2, fixture.dataFilesVersion2, 2)
 
-	// Error case - version after latest commit
-	_, err = log.SnapshotForVersionAsOf(3)
-	assert.ErrorIs(t, err, errno.VersionNotExist(3, 0, 2))
+			// Error case - version after latest commit
+			_, err = log.SnapshotForVersionAsOf(3)
+			assert.ErrorIs(t, err, errno.VersionNotExist(3, 0, 2))
 
-	// Error case - version before earliest commit
-	_, err = log.SnapshotForVersionAsOf(-1)
-	assert.ErrorIs(t, err, errno.VersionNotExist(-1, 0, 2))
+			// Error case - version before earliest commit
+			_, err = log.SnapshotForVersionAsOf(-1)
+			assert.ErrorIs(t, err, errno.VersionNotExist(-1, 0, 2))
 
-	f := filenames.DeltaFile(destTableDir+"/_delta_log/", 0)
-
-	err = os.Remove(f)
-	assert.NoError(t, err)
-	_, err = log.SnapshotForVersionAsOf(0)
-	assert.ErrorIs(t, err, errno.NoReproducibleHistoryFound(""))
-
+			f := filenames.DeltaFile(tt.copiedDir+"/_delta_log/", 0)
+			err = tt.blobDir.DeleteFile(f)
+			assert.NoError(t, err)
+			_, err = log.SnapshotForVersionAsOf(0)
+			assert.ErrorIs(t, err, errno.NoReproducibleHistoryFound(""))
+		})
+	}
 }
 
 func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_before_timestamp(t *testing.T) {
@@ -183,16 +180,25 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 }
 
 func TestLog_time_travel_with_schema_changes_should_instantiate_old_schema(t *testing.T) {
-	tablePath := getTestFileDir("time-travel-schema-changes-a")
-	orig_schema_data_files := getTestDirDataFile(tablePath)
 
-	log, err := getTestFileTable("time-travel-schema-changes-b")
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	f := newTimeTravelFixture()
-	s, err := log.SnapshotForVersionAsOf(0)
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, orig_schema_data_files, 0)
+			tablePath := getTestFileDir("time-travel-schema-changes-a")
+			orig_schema_data_files := getTestDirDataFile(tablePath)
+
+			log, err := tt.getLog("time-travel-schema-changes-b")
+			assert.NoError(t, err)
+
+			f := newTimeTravelFixture()
+			s, err := log.SnapshotForVersionAsOf(0)
+			assert.NoError(t, err)
+			f.verifyTimeTravelSnapshot(t, s, orig_schema_data_files, 0)
+		})
+	}
 }
 
 func TestLog_time_travel_with_partition_changes_should_instantiate_old_schema(t *testing.T) {
