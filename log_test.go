@@ -59,13 +59,6 @@ func getTestFileTable(name string) (Log, error) {
 
 // Azure Blob log store tests
 
-func getTestAzBlobDir(name string) string {
-	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
-	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
-
-	return fmt.Sprintf("azblob://golden?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", name)
-}
-
 func getTestAzBlobBaseDir() string {
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
 	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
@@ -77,12 +70,6 @@ func getTestAzBlobConfig() Config {
 	return Config{
 		StoreType: "azblob",
 	}
-}
-
-func getTestAzBlobTable(name string) (Log, error) {
-	return ForTable(getTestAzBlobDir(name),
-		getTestAzBlobConfig(),
-		&SystemClock{})
 }
 
 func getTestEngineInfo() string {
@@ -100,25 +87,6 @@ func getTestMetedata() *action.Metadata {
 		panic(err)
 	}
 	return &action.Metadata{SchemaString: schemaString}
-}
-
-func testUsingTempTable(t *testing.T, baseDir string, config Config, fn func(Log)) {
-
-	blobDir, err := util.NewBlobDir(baseDir)
-	assert.NoError(t, err)
-
-	tempDir, tempFile, err := blobDir.CreateTemp()
-	assert.NoError(t, err)
-
-	defer func() {
-		assert.NoError(t, blobDir.Delete(tempDir, []string{tempFile}, true))
-		assert.NoError(t, blobDir.Close())
-	}()
-
-	log, err := ForTable(fmt.Sprintf("%s&prefix=%s", baseDir, tempDir), config, &SystemClock{})
-	assert.NoError(t, err)
-
-	fn(log)
 }
 
 type testLogCase struct {
@@ -201,6 +169,9 @@ func newTestLogCases(names ...string) []*testLogCase {
 		if name == "file" {
 			cases = append(cases, newTestLogCase("file", getTestFileBaseDir(), getTestFileConfig()))
 		} else if name == "azblob" {
+			os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
+			os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
+
 			cases = append(cases, newTestLogCase("azblob", getTestAzBlobBaseDir(), getTestAzBlobConfig()))
 		} else {
 			panic("unsupported test case for " + name)
