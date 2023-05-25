@@ -2,7 +2,6 @@ package deltago
 
 import (
 	"io"
-	"os"
 	"sort"
 	"strconv"
 	"testing"
@@ -34,27 +33,7 @@ func mustNoError(err error) {
 	}
 }
 
-func (s *scanTestFixture) withLog(actions []action.Action) (Log, string) {
-	dir, err := os.MkdirTemp("", "delta")
-	mustNoError(err)
-
-	log, err := ForTable("file://"+dir, getTestFileConfig(), &SystemClock{})
-	mustNoError(err)
-
-	trx, err := log.StartTransaction()
-	mustNoError(err)
-	_, err = trx.Commit(iter.FromSlice([]action.Action{s.metadata}), s.op, "engineInfo")
-	mustNoError(err)
-
-	trx, err = log.StartTransaction()
-	mustNoError(err)
-	_, err = trx.Commit(iter.FromSlice(actions), s.op, "engineInfo")
-	mustNoError(err)
-
-	return log, dir
-}
-
-func (s *scanTestFixture) withLogV2(log Log, actions []action.Action) {
+func (s *scanTestFixture) setUp(log Log, actions []action.Action) {
 
 	trx, err := log.StartTransaction()
 	mustNoError(err)
@@ -140,7 +119,7 @@ func TestScan_properly_splits_metadata_pushed_and_data_residual_predicates(t *te
 			assert.NoError(t, err)
 
 			f := newScanTestFixtures()
-			f.withLogV2(log, f.files)
+			f.setUp(log, f.files)
 
 			mixedConjunct := types.NewLessThan(f.schema.Column("col2"), f.schema.Column("col4"))
 			filter := types.NewAnd(types.NewAnd(f.metaConjunct, f.dataConjunct), mixedConjunct)
@@ -171,7 +150,7 @@ func TestScan_filtered_scan_with_a_metadata_pushed_conjunct_should_return_matche
 			assert.NoError(t, err)
 
 			f := newScanTestFixtures()
-			f.withLogV2(log, f.files)
+			f.setUp(log, f.files)
 
 			filter := types.NewAnd(f.metaConjunct, f.dataConjunct)
 			s, err := log.Update()
@@ -212,7 +191,7 @@ func TestScan_filtered_scan_with_only_data_residual_predicate_should_return_all_
 			assert.NoError(t, err)
 
 			f := newScanTestFixtures()
-			f.withLogV2(log, f.files)
+			f.setUp(log, f.files)
 
 			filter := f.dataConjunct
 			s, err := log.Update()
