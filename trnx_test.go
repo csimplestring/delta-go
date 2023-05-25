@@ -134,164 +134,221 @@ func checkTrx(
 
 func TestTrx_apend_apend(t *testing.T) {
 	f := newTrxTestFixture()
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
 
-	// setup
-	setUpTestTrxLog([]action.Action{f.metadata_colXY, &action.Protocol{MinReaderVersion: 1, MinWriterVersion: 2}}, log, f, t)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	// reads
-	reads := []func(OptimisticTransaction){
-		func(trx OptimisticTransaction) {
-			_, err := trx.Metadata()
+			log, err := tt.getTempLog()
 			assert.NoError(t, err)
-		},
+
+			// setup
+			setUpTestTrxLog([]action.Action{f.metadata_colXY, &action.Protocol{MinReaderVersion: 1, MinWriterVersion: 2}}, log, f, t)
+
+			// reads
+			reads := []func(OptimisticTransaction){
+				func(trx OptimisticTransaction) {
+					_, err := trx.Metadata()
+					assert.NoError(t, err)
+				},
+			}
+			// concurrentWrites
+			concurrentWrites := []func(OptimisticTransaction, []action.Action){
+				func(trx OptimisticTransaction, writes []action.Action) {
+					_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+					assert.NoError(t, err)
+				},
+			}
+			conflict := false
+			checkTrx(conflict, log, reads, concurrentWrites, []action.Action{f.addA}, []action.Action{f.addB}, f.op, f.engineInfo, t)
+		})
 	}
-	// concurrentWrites
-	concurrentWrites := []func(OptimisticTransaction, []action.Action){
-		func(trx OptimisticTransaction, writes []action.Action) {
-			_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
-			assert.NoError(t, err)
-		},
-	}
-	conflict := false
-	checkTrx(conflict, log, reads, concurrentWrites, []action.Action{f.addA}, []action.Action{f.addB}, f.op, f.engineInfo, t)
 }
 
 func TestTrx_disjoint_txns(t *testing.T) {
 	f := newTrxTestFixture()
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
 
-	// setup
-	setUpTestTrxLog([]action.Action{f.metadata_colXY, &action.Protocol{MinReaderVersion: 1, MinWriterVersion: 2}}, log, f, t)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	// reads
-	reads := []func(OptimisticTransaction){
-		func(trx OptimisticTransaction) {
-			_, err := trx.TxnVersion("t1")
+			log, err := tt.getTempLog()
 			assert.NoError(t, err)
-		},
+
+			// setup
+			setUpTestTrxLog([]action.Action{f.metadata_colXY, &action.Protocol{MinReaderVersion: 1, MinWriterVersion: 2}}, log, f, t)
+
+			// reads
+			reads := []func(OptimisticTransaction){
+				func(trx OptimisticTransaction) {
+					_, err := trx.TxnVersion("t1")
+					assert.NoError(t, err)
+				},
+			}
+			// concurrentWrites
+			concurrentWrites := []func(OptimisticTransaction, []action.Action){
+				func(trx OptimisticTransaction, writes []action.Action) {
+					_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+					assert.NoError(t, err)
+				},
+			}
+			concurrentWritesActions := []action.Action{&action.SetTransaction{AppId: "t2", Version: 0, LastUpdated: util.PtrOf[int64](1234)}}
+			actions := []action.Action{}
+			conflict := false
+			checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+		})
 	}
-	// concurrentWrites
-	concurrentWrites := []func(OptimisticTransaction, []action.Action){
-		func(trx OptimisticTransaction, writes []action.Action) {
-			_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
-			assert.NoError(t, err)
-		},
-	}
-	concurrentWritesActions := []action.Action{&action.SetTransaction{AppId: "t2", Version: 0, LastUpdated: util.PtrOf[int64](1234)}}
-	actions := []action.Action{}
-	conflict := false
-	checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+
 }
 
 func TestTrx_disjoint_delete_reads(t *testing.T) {
 	f := newTrxTestFixture()
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
 
-	// setup
-	setUpTestTrxLog([]action.Action{f.metadata_partX, f.addA_partX2}, log, f, t)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	// reads
-	reads := []func(OptimisticTransaction){
-		func(trx OptimisticTransaction) {
-			_, err := trx.MarkFilesAsRead(f.colXEq1Filter)
+			log, err := tt.getTempLog()
 			assert.NoError(t, err)
-		},
+
+			// setup
+			setUpTestTrxLog([]action.Action{f.metadata_partX, f.addA_partX2}, log, f, t)
+
+			// reads
+			reads := []func(OptimisticTransaction){
+				func(trx OptimisticTransaction) {
+					_, err := trx.MarkFilesAsRead(f.colXEq1Filter)
+					assert.NoError(t, err)
+				},
+			}
+			// concurrentWrites
+			concurrentWrites := []func(OptimisticTransaction, []action.Action){
+				func(trx OptimisticTransaction, writes []action.Action) {
+					_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+					assert.NoError(t, err)
+				},
+			}
+			concurrentWritesActions := []action.Action{f.removeA}
+			actions := []action.Action{}
+			conflict := false
+			checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+		})
 	}
-	// concurrentWrites
-	concurrentWrites := []func(OptimisticTransaction, []action.Action){
-		func(trx OptimisticTransaction, writes []action.Action) {
-			_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
-			assert.NoError(t, err)
-		},
-	}
-	concurrentWritesActions := []action.Action{f.removeA}
-	actions := []action.Action{}
-	conflict := false
-	checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+
 }
 
 func TestTrx_disjoint_add_reads(t *testing.T) {
 	f := newTrxTestFixture()
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
 
-	// setup
-	setUpTestTrxLog([]action.Action{f.metadata_partX}, log, f, t)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	// reads
-	reads := []func(OptimisticTransaction){
-		func(trx OptimisticTransaction) {
-			_, err := trx.MarkFilesAsRead(f.colXEq1Filter)
+			log, err := tt.getTempLog()
 			assert.NoError(t, err)
-		},
+
+			// setup
+			setUpTestTrxLog([]action.Action{f.metadata_partX}, log, f, t)
+
+			// reads
+			reads := []func(OptimisticTransaction){
+				func(trx OptimisticTransaction) {
+					_, err := trx.MarkFilesAsRead(f.colXEq1Filter)
+					assert.NoError(t, err)
+				},
+			}
+			// concurrentWrites
+			concurrentWrites := []func(OptimisticTransaction, []action.Action){
+				func(trx OptimisticTransaction, writes []action.Action) {
+					_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+					assert.NoError(t, err)
+				},
+			}
+			concurrentWritesActions := []action.Action{f.addA_partX2}
+			actions := []action.Action{}
+			conflict := false
+			checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+		})
 	}
-	// concurrentWrites
-	concurrentWrites := []func(OptimisticTransaction, []action.Action){
-		func(trx OptimisticTransaction, writes []action.Action) {
-			_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
-			assert.NoError(t, err)
-		},
-	}
-	concurrentWritesActions := []action.Action{f.addA_partX2}
-	actions := []action.Action{}
-	conflict := false
-	checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
 }
 
 func TestTrx_add_rea_no_write(t *testing.T) {
 	f := newTrxTestFixture()
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
 
-	// setup
-	setUpTestTrxLog([]action.Action{f.metadata_partX}, log, f, t)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	// reads
-	reads := []func(OptimisticTransaction){
-		func(trx OptimisticTransaction) {
-			_, err := trx.MarkFilesAsRead(f.colXEq1Filter)
+			log, err := tt.getTempLog()
 			assert.NoError(t, err)
-		},
+
+			// setup
+			setUpTestTrxLog([]action.Action{f.metadata_partX}, log, f, t)
+
+			// reads
+			reads := []func(OptimisticTransaction){
+				func(trx OptimisticTransaction) {
+					_, err := trx.MarkFilesAsRead(f.colXEq1Filter)
+					assert.NoError(t, err)
+				},
+			}
+			// concurrentWrites
+			concurrentWrites := []func(OptimisticTransaction, []action.Action){
+				func(trx OptimisticTransaction, writes []action.Action) {
+					_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+					assert.NoError(t, err)
+				},
+			}
+			concurrentWritesActions := []action.Action{f.addA_partX1}
+			actions := []action.Action{}
+			conflict := false
+			checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+		})
 	}
-	// concurrentWrites
-	concurrentWrites := []func(OptimisticTransaction, []action.Action){
-		func(trx OptimisticTransaction, writes []action.Action) {
-			_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
-			assert.NoError(t, err)
-		},
-	}
-	concurrentWritesActions := []action.Action{f.addA_partX1}
-	actions := []action.Action{}
-	conflict := false
-	checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
 }
 
 func TestTrx_delete_delete(t *testing.T) {
 	f := newTrxTestFixture()
-	log, dir := getTempLog(t)
-	defer os.RemoveAll(dir)
 
-	// setup
-	setUpTestTrxLog([]action.Action{f.metadata_colXY, &action.Protocol{MinReaderVersion: 1, MinWriterVersion: 2}}, log, f, t)
+	for _, tt := range newTestLogCases("file") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	// reads
-	reads := []func(OptimisticTransaction){}
-
-	// concurrentWrites
-	concurrentWrites := []func(OptimisticTransaction, []action.Action){
-		func(trx OptimisticTransaction, writes []action.Action) {
-			_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+			log, err := tt.getTempLog()
 			assert.NoError(t, err)
-		},
+
+			// setup
+			setUpTestTrxLog([]action.Action{f.metadata_colXY, &action.Protocol{MinReaderVersion: 1, MinWriterVersion: 2}}, log, f, t)
+
+			// reads
+			reads := []func(OptimisticTransaction){}
+
+			// concurrentWrites
+			concurrentWrites := []func(OptimisticTransaction, []action.Action){
+				func(trx OptimisticTransaction, writes []action.Action) {
+					_, err := trx.Commit(iter.FromSlice(writes), f.op, f.engineInfo)
+					assert.NoError(t, err)
+				},
+			}
+			concurrentWritesActions := []action.Action{f.removeA}
+			actions := []action.Action{f.removeA_time5}
+			conflict := true
+			checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+		})
 	}
-	concurrentWritesActions := []action.Action{f.removeA}
-	actions := []action.Action{f.removeA_time5}
-	conflict := true
-	checkTrx(conflict, log, reads, concurrentWrites, concurrentWritesActions, actions, f.op, f.engineInfo, t)
+
 }
 
 func TestTrx_add_read_write(t *testing.T) {

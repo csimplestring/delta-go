@@ -111,7 +111,12 @@ func (l *LocalStore) Write(path string, iter iter.Iter[string], overwrite bool) 
 	}
 
 	if !overwrite {
-		if _, err := os.Stat(filepath.Join(l.logPath, path)); err == nil {
+
+		exist, err := l.s.bucket.Exists(context.Background(), path)
+		if err != nil {
+			return eris.Wrap(err, "something wrong when checking for existence of "+path)
+		}
+		if exist {
 			return errno.FileAlreadyExists(path)
 		}
 	}
