@@ -1,7 +1,6 @@
 package deltago
 
 import (
-	"os"
 	"testing"
 
 	"github.com/csimplestring/delta-go/action"
@@ -87,16 +86,6 @@ func setUpTestTrxLog(setup []action.Action, log Log, f *trxTestFixture, t *testi
 		_, err = trx.Commit(iter.FromSlice([]action.Action{s}), f.op, f.engineInfo)
 		assert.NoError(t, err)
 	}
-}
-
-func getTempLog(t *testing.T) (Log, string) {
-	dir, err := os.MkdirTemp("", "delta")
-	assert.NoError(t, err)
-
-	log, err := ForTable("file://"+dir, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
-
-	return log, dir
 }
 
 func checkTrx(
