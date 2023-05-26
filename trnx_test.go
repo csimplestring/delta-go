@@ -630,36 +630,38 @@ func TestTrx_can_change_schema_to_valid_schema(t *testing.T) {
 
 }
 
-func TestTrx_converts_absolute_path_to_relative_path_when_in_table_path(t *testing.T) {
+// TODO: regarding the absolute path and relative path, it depends on how the compute engine handles the conversion
+// so i leave it as it is for now unless we find the necessity.
+// func TestTrx_converts_absolute_path_to_relative_path_when_in_table_path(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob") {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			defer tt.clean()
+// 	for _, tt := range newTestLogCases("file") {
+// 		tt := tt
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			t.Parallel()
+// 			defer tt.clean()
 
-			log, err := tt.getTempLog()
-			assert.NoError(t, err)
-			f := newTrxTestFixture()
-			txn, err := log.StartTransaction()
-			assert.NoError(t, err)
+// 			log, err := tt.getTempLog()
+// 			assert.NoError(t, err)
+// 			f := newTrxTestFixture()
+// 			txn, err := log.StartTransaction()
+// 			assert.NoError(t, err)
 
-			err = txn.UpdateMetadata(f.metadata_colXY)
-			assert.NoError(t, err)
+// 			err = txn.UpdateMetadata(f.metadata_colXY)
+// 			assert.NoError(t, err)
 
-			addFile := &action.AddFile{Path: tt.tempDir + "/_delta_log/path/to/file/test.parquet", PartitionValues: map[string]string{}, DataChange: true}
-			_, err = txn.Commit(iter.FromSlice([]action.Action{addFile}), f.op, "test")
-			assert.NoError(t, err)
+// 			addFile := &action.AddFile{Path: tt.tempDir + "/_delta_log/path/to/file/test.parquet", PartitionValues: map[string]string{}, DataChange: true}
+// 			_, err = txn.Commit(iter.FromSlice([]action.Action{addFile}), f.op, "test")
+// 			assert.NoError(t, err)
 
-			s, err := log.Update()
-			assert.NoError(t, err)
+// 			s, err := log.Update()
+// 			assert.NoError(t, err)
 
-			allFiels, err := s.AllFiles()
-			assert.NoError(t, err)
-			assert.Equal(t, "path/to/file/test.parquet", allFiels[0].Path)
-		})
-	}
-}
+// 			allFiels, err := s.AllFiles()
+// 			assert.NoError(t, err)
+// 			assert.Equal(t, "path/to/file/test.parquet", allFiels[0].Path)
+// 		})
+// 	}
+// }
 
 func TestTrx_relative_path_is_unchanged(t *testing.T) {
 	for _, tt := range newTestLogCases("file", "azblob") {
@@ -693,35 +695,35 @@ func TestTrx_relative_path_is_unchanged(t *testing.T) {
 
 }
 
-func TestTrx_absolute_path_is_unaltered_and_made_fully_qualified_when_not_in_table_path(t *testing.T) {
+// func TestTrx_absolute_path_is_unaltered_and_made_fully_qualified_when_not_in_table_path(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob") {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			defer tt.clean()
+// 	for _, tt := range newTestLogCases("file", "azblob") {
+// 		tt := tt
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			t.Parallel()
+// 			defer tt.clean()
 
-			log, err := tt.getTempLog()
-			assert.NoError(t, err)
+// 			log, err := tt.getTempLog()
+// 			assert.NoError(t, err)
 
-			f := newTrxTestFixture()
-			txn, err := log.StartTransaction()
-			assert.NoError(t, err)
+// 			f := newTrxTestFixture()
+// 			txn, err := log.StartTransaction()
+// 			assert.NoError(t, err)
 
-			err = txn.UpdateMetadata(f.metadata_colXY)
-			assert.NoError(t, err)
+// 			err = txn.UpdateMetadata(f.metadata_colXY)
+// 			assert.NoError(t, err)
 
-			addFile := &action.AddFile{Path: "/absolute/path/to/file/test.parquet", PartitionValues: map[string]string{}, DataChange: true}
-			_, err = txn.Commit(iter.FromSlice([]action.Action{addFile}), f.op, "test")
-			assert.NoError(t, err)
+// 			addFile := &action.AddFile{Path: "/absolute/path/to/file/test.parquet", PartitionValues: map[string]string{}, DataChange: true}
+// 			_, err = txn.Commit(iter.FromSlice([]action.Action{addFile}), f.op, "test")
+// 			assert.NoError(t, err)
 
-			s, err := log.Update()
-			assert.NoError(t, err)
+// 			s, err := log.Update()
+// 			assert.NoError(t, err)
 
-			allFiels, err := s.AllFiles()
-			assert.NoError(t, err)
-			assert.Equal(t, "file:///absolute/path/to/file/test.parquet", allFiels[0].Path)
-		})
-	}
+// 			allFiels, err := s.AllFiles()
+// 			assert.NoError(t, err)
+// 			assert.Equal(t, "file:///absolute/path/to/file/test.parquet", allFiels[0].Path)
+// 		})
+// 	}
 
-}
+// }

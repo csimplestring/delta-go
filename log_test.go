@@ -833,7 +833,6 @@ func TestLog_table_exists(t *testing.T) {
 }
 
 func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
-	t.Parallel()
 
 	schema := types.NewStructType([]*types.StructField{
 		types.NewStructField("a", &types.StringType{}, true),
@@ -847,7 +846,6 @@ func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
 	for _, tt := range newTestLogCases("file", "azblob") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			defer tt.clean()
 
 			inputs := []tuple.T2[[]string, []string]{
