@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"os"
 	"strings"
@@ -71,7 +72,10 @@ func (b *BlobDir) Copy(srcPrefix string) (string, []string, error) {
 
 	ctx := context.Background()
 
-	dir := fmt.Sprintf("temp-%s-xxx-%d", srcPrefix, time.Now().Unix())
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+
+	dir := fmt.Sprintf("temp-%s-xxx-%d", srcPrefix, r1.Int())
 
 	blobs, err := b.listingBlob(ctx, srcPrefix)
 	if err != nil {
@@ -124,7 +128,10 @@ func (b *BlobDir) DeleteFile(file string) error {
 
 func (b *BlobDir) CreateTemp() (dir string, placeHolder string, err error) {
 
-	dir = fmt.Sprintf("temp-%d/", time.Now().Unix())
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+
+	dir = fmt.Sprintf("temp-%d/", r1.Int())
 	placeHolder = dir + ".xxx"
 	err = b.bucket.WriteAll(context.Background(), placeHolder, []byte{}, nil)
 	if err != nil {
