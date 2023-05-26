@@ -2,6 +2,7 @@ package deltago
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"sort"
 	"time"
@@ -106,16 +107,16 @@ func LoadMetadataFromFile(s store.Store) (mo.Option[*CheckpointMetaDataJSON], er
 				continue
 			}
 		}
+		defer lines.Close()
 
-		if !lines.Next() {
+		line, err := lines.Next()
+
+		if err == io.EOF {
 			log.Println("failed to read last checkpoint, end of iterator, try again")
 			continue
 		}
-
-		line, err := lines.Value()
 		if err != nil {
 			log.Println("failed to get line from iterator when reading last checkpoint, try again")
-			lines.Close()
 			continue
 		}
 
@@ -161,12 +162,11 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 		if err != nil {
 			return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
 		}
+		defer iter.Close()
 
 		var checkpoints []*CheckpointInstance
-		for f, err := iter.Value(); iter.Next(); f, err = iter.Value() {
-			if err != nil {
-				return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
-			}
+		for f, err := iter.Next(); err == nil; f, err = iter.Next() {
+
 			if !filenames.IsCheckpointFile(f.Path()) {
 				continue
 			}
@@ -176,6 +176,9 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 			} else {
 				break
 			}
+		}
+		if err != nil && err != io.EOF {
+			return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
 		}
 
 		lastCheckpoint := GetLatestCompleteCheckpointFromList(checkpoints, cv)
@@ -235,19 +238,16 @@ func GetLatestCompleteCheckpointFromList(instances []*CheckpointInstance, notLat
 	return mo.None[*CheckpointInstance]()
 }
 
-func checkpoint(store store.Store, snapshotToCheckpoint *snapshotImp) error {
-	//var checkpointWriter *checkpointWriter
-	wc := parquetActionWriterConfig{}
-	storageType := snapshotToCheckpoint.config.StorageConfig.Scheme
-	if storageType == Local {
-		wc.Local = &parquetActionLocalWriterConfig{}
-	} else {
-		panic("unsupported storage type")
+func checkpoint(logPath string, store store.Store, snapshotToCheckpoint *snapshotImp) error {
+
+	pw, err := newParquetActionWriter(logPath)
+	if err != nil {
+		return eris.Wrap(err, "can not new ParquetActionWriter")
 	}
 
 	writer := &checkpointWriter{
 		schemaText: actionSchemaDefinitionString,
-		pw:         newParquetActionWriter(&wc),
+		pw:         pw,
 	}
 
 	checkpointMetadata, err := writer.write(snapshotToCheckpoint)

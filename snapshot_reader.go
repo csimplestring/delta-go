@@ -1,6 +1,7 @@
 package deltago
 
 import (
+	"io"
 	"log"
 	"strings"
 	"sync"
@@ -140,11 +141,7 @@ func (sr *SnapshotReader) getLogSegmentForVersion(startCheckpoint mo.Option[int6
 	var newFiles []*store.FileMeta
 	// List from the starting  If a checkpoint doesn't exist, this will still return
 	// deltaVersion=0.
-	for iter.Next() {
-		f, err := iter.Value()
-		if err != nil {
-			return nil, err
-		}
+	for f, err := iter.Next(); err == nil; f, err = iter.Next() {
 		if !(filenames.IsCheckpointFile(f.Path()) || filenames.IsDeltaFile(f.Path())) {
 			continue
 		}
@@ -160,6 +157,9 @@ func (sr *SnapshotReader) getLogSegmentForVersion(startCheckpoint mo.Option[int6
 		} else {
 			break
 		}
+	}
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
 	if len(newFiles) == 0 && startCheckpoint.IsAbsent() {

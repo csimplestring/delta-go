@@ -3,6 +3,7 @@ package deltago
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 
@@ -85,7 +86,6 @@ type optimisticTransactionImp struct {
 	commitAttemptStartTime int64
 	clock                  Clock
 
-	fs             store.FS
 	configurations tableConfigurations
 	lock           *sync.Mutex
 	logStore       store.Store
@@ -95,7 +95,6 @@ type optimisticTransactionImp struct {
 func newOptimisticTransaction(snapshot *snapshotImp,
 	snapshotManager *SnapshotReader,
 	clock Clock,
-	fs store.FS,
 	configuration tableConfigurations,
 	lock *sync.Mutex,
 	logStore store.Store,
@@ -116,7 +115,6 @@ func newOptimisticTransaction(snapshot *snapshotImp,
 		commitAttemptStartTime: 0,
 
 		clock:          clock,
-		fs:             fs,
 		configurations: configuration,
 		lock:           lock,
 		logStore:       logStore,
@@ -147,18 +145,17 @@ func (trx *optimisticTransactionImp) Commit(actionsIter iter.Iter[action.Action]
 	defer actionsIter.Close()
 
 	var actions []action.Action
-	for actionsIter.Next() {
-		a, err := actionsIter.Value()
-		if err != nil {
-			return CommitResult{}, err
-		}
-
+	var err error
+	for a, err := actionsIter.Next(); err == nil; a, err = actionsIter.Next() {
 		switch v := a.(type) {
 		case *action.Metadata:
 			trx.UpdateMetadata(v)
 		default:
 			actions = append(actions, v)
 		}
+	}
+	if err != nil && err != io.EOF {
+		return CommitResult{}, err
 	}
 
 	preparedActions, err := trx.prepareCommit(actions)
@@ -250,14 +247,13 @@ func (trx *optimisticTransactionImp) MarkFilesAsRead(readPredicate types.Express
 		trx.readPredicates = append(trx.readPredicates, scan.PushedPredicate())
 	}
 
-	for matchedFiles.Next() {
-		f, err := matchedFiles.Value()
-		if err != nil {
-			return nil, err
-		} else {
-			trx.readFiles.Add(f)
-		}
+	for f, err := matchedFiles.Next(); err == nil; f, err = matchedFiles.Next() {
+		trx.readFiles.Add(f)
 	}
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
 	matchedFiles.Close()
 
 	return scan, nil
@@ -472,8 +468,12 @@ func (trx *optimisticTransactionImp) prepareCommit(actions []action.Action) ([]a
 	}
 
 	if trx.snapshot.version == -1 {
-		if !trx.fs.Exists(trx.logPath) {
-			if err := trx.fs.Mkdirs(trx.logPath); err != nil {
+		exist, err := trx.logStore.Exists(trx.logPath)
+		if err != nil {
+			return nil, err
+		}
+		if !exist {
+			if err := trx.logStore.Create(trx.logPath); err != nil {
 				return nil, err
 			}
 		}
@@ -583,7 +583,7 @@ func (trx *optimisticTransactionImp) doCommit(attemptVersion int64, actions []ac
 		return 0, err
 	}
 
-	if err := trx.logStore.Write(filenames.DeltaFile(trx.logPath, attemptVersion),
+	if err := trx.logStore.Write(filenames.DeltaFile(trx.logStore.Root(), attemptVersion),
 		iter.FromSlice(actionStrings), false); err != nil {
 		return 0, err
 	}
@@ -658,7 +658,7 @@ func (trx *optimisticTransactionImp) postCommit(commitVersion int64) error {
 		if err != nil {
 			return err
 		}
-		if err := checkpoint(trx.logStore, snaptshot); err != nil {
+		if err := checkpoint(trx.logPath, trx.logStore, snaptshot); err != nil {
 			if eris.Is(err, errno.ErrIllegalState) {
 				log.Println("Failed to checkpoint table state." + err.Error())
 			} else {

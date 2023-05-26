@@ -15,7 +15,7 @@ What is it not?
 ## Supported backends
 
 - Local file system (Done)
-- Azure Blob Storage (WIP)
+- Azure Blob Storage (Done)
 
 ## Status
 

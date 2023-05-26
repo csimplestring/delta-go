@@ -1,7 +1,9 @@
 package deltago
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/csimplestring/delta-go/action"
@@ -12,12 +14,17 @@ import (
 )
 
 func TestLocalParquetReadWrite(t *testing.T) {
-	w := &localParquetActionWriter{}
 
-	path := "./local-test.parquet"
+	dir, err := filepath.Abs("./")
+	assert.NoError(t, err)
+
+	w, err := newParquetActionWriter(fmt.Sprintf("file://%s", dir))
+	assert.NoError(t, err)
+
+	path := "local-test.parquet"
 	defer os.RemoveAll(path)
 
-	err := w.Open(path, actionSchemaDefinitionString)
+	err = w.Open(path, actionSchemaDefinitionString)
 	assert.NoError(t, err)
 
 	expected := []*action.SingleAction{
@@ -165,7 +172,9 @@ func TestLocalParquetReadWrite(t *testing.T) {
 	err = w.Close()
 	assert.NoError(t, err)
 
-	r := localCheckpointReader{}
+	r, err := newCheckpointReader(fmt.Sprintf("file://%s", dir))
+	assert.NoError(t, err)
+
 	it, err := r.Read(path)
 	assert.NoError(t, err)
 	defer it.Close()

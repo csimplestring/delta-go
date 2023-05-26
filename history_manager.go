@@ -1,6 +1,7 @@
 package deltago
 
 import (
+	"io"
 	"math"
 
 	"github.com/barweiss/go-tuple"
@@ -24,12 +25,7 @@ func (h *historyManager) getCommitInfo(version int64) (*action.CommitInfo, error
 	defer iter.Close()
 
 	var c *action.CommitInfo
-	for iter.Next() {
-		v, err := iter.Value()
-		if err != nil {
-			return nil, err
-		}
-
+	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
 		action, err := action.FromJson(v)
 		if err != nil {
 			return nil, err
@@ -39,6 +35,9 @@ func (h *historyManager) getCommitInfo(version int64) (*action.CommitInfo, error
 			c = singleAction.CommitInfo
 			break
 		}
+	}
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
 	if c == nil {
@@ -113,15 +112,14 @@ func (h *historyManager) getEarliestDeltaFile() (int64, error) {
 	defer iter.Close()
 
 	var earliestVersionOpt *store.FileMeta
-	for iter.Next() {
-		v, err := iter.Value()
-		if err != nil {
-			return 0, err
-		}
+	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
 		if filenames.IsDeltaFile(v.Path()) {
 			earliestVersionOpt = v
 			break
 		}
+	}
+	if err != nil && err != io.EOF {
+		return 0, err
 	}
 	if earliestVersionOpt == nil {
 		return 0, errno.NoHistoryFound(h.logStore.Root())
@@ -138,14 +136,13 @@ func (h *historyManager) getEarliestReproducibleCommitVersion() (int64, error) {
 	defer iter.Close()
 
 	var files []*store.FileMeta
-	for iter.Next() {
-		f, err := iter.Value()
-		if err != nil {
-			return 0, err
-		}
+	for f, err := iter.Next(); err == nil; f, err = iter.Next() {
 		if filenames.IsCheckpointFile(f.Path()) || filenames.IsDeltaFile(f.Path()) {
 			files = append(files, f)
 		}
+	}
+	if err != nil && err != io.EOF {
+		return 0, err
 	}
 
 	checkpointMap := make(map[tuple.T2[int64, int]]int)
@@ -213,11 +210,7 @@ func (h *historyManager) getCommits(logStore store.Store, logPath string, start 
 	defer iter.Close()
 
 	var commits []*commit
-	for iter.Next() {
-		f, err := iter.Value()
-		if err != nil {
-			return nil, err
-		}
+	for f, err := iter.Next(); err == nil; f, err = iter.Next() {
 		if filenames.IsDeltaFile(f.Path()) {
 			c := &commit{version: filenames.DeltaVersion(f.Path()), timestamp: f.TimeModified().UnixMilli()}
 			if c.version < end {
@@ -227,25 +220,28 @@ func (h *historyManager) getCommits(logStore store.Store, logPath string, start 
 			}
 		}
 	}
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
 
 	return commits, nil
 }
 
-func (h *historyManager) monotonizeCommitTimestamps(commits []action.CommitMarker) []action.CommitMarker {
-	i := 0
-	length := len(commits)
-	for i < length-1 {
-		prevTimestamp := commits[i].GetTimestamp()
-		if commits[i].GetVersion() > commits[i+1].GetVersion() {
-			panic("Unordered commits provided.")
-		}
-		if prevTimestamp >= commits[i+1].GetTimestamp() {
-			commits[i+1] = commits[i+1].WithTimestamp(prevTimestamp + 1)
-		}
-		i += 1
-	}
-	return commits
-}
+// func (h *historyManager) monotonizeCommitTimestamps(commits []action.CommitMarker) []action.CommitMarker {
+// 	i := 0
+// 	length := len(commits)
+// 	for i < length-1 {
+// 		prevTimestamp := commits[i].GetTimestamp()
+// 		if commits[i].GetVersion() > commits[i+1].GetVersion() {
+// 			panic("Unordered commits provided.")
+// 		}
+// 		if prevTimestamp >= commits[i+1].GetTimestamp() {
+// 			commits[i+1] = commits[i+1].WithTimestamp(prevTimestamp + 1)
+// 		}
+// 		i += 1
+// 	}
+// 	return commits
+// }
 
 type commit struct {
 	version   int64

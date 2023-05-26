@@ -1,6 +1,8 @@
 package deltago
 
 import (
+	"io"
+
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/path"
@@ -88,17 +90,14 @@ type scanFileIterator struct {
 }
 
 func (s *scanFileIterator) findNextValid() (mo.Option[*action.AddFile], error) {
-	for s.iter.Next() {
-		tuple, err := s.iter.Value()
-		if err != nil {
-			return mo.None[*action.AddFile](), eris.Wrap(err, "")
-		}
+	var err error
+	for tuple, err := s.iter.Next(); err == nil; tuple, err = s.iter.Next() {
 
 		isCheckpoint := tuple.fromCheckpoint
 
 		switch a := tuple.act.(type) {
 		case *action.AddFile:
-			canonicalPath, err := path.Canonicalize(a.Path, string(s.config.StorageConfig.Scheme))
+			canonicalPath, err := path.Canonicalize(a.Path, s.config.StoreType)
 			if err != nil {
 				return mo.None[*action.AddFile](), err
 			}
@@ -118,7 +117,7 @@ func (s *scanFileIterator) findNextValid() (mo.Option[*action.AddFile], error) {
 
 		case *action.RemoveFile:
 			if !isCheckpoint {
-				canonicalPath, err := path.Canonicalize(a.Path, string(s.config.StorageConfig.Scheme))
+				canonicalPath, err := path.Canonicalize(a.Path, s.config.StoreType)
 				if err != nil {
 					return mo.None[*action.AddFile](), err
 				}
@@ -126,6 +125,9 @@ func (s *scanFileIterator) findNextValid() (mo.Option[*action.AddFile], error) {
 				s.tombstones.Add(canonicalizeRemove.Path)
 			}
 		}
+	}
+	if err != nil && err != io.EOF {
+		return mo.None[*action.AddFile](), eris.Wrap(err, "")
 	}
 	return mo.None[*action.AddFile](), nil
 }
@@ -152,16 +154,16 @@ func (s *scanFileIterator) setNextMatching() error {
 	return nil
 }
 
-func (s *scanFileIterator) Next() bool {
+func (s *scanFileIterator) hasNext() bool {
 	if s.nextMatching.IsAbsent() {
 		s.setNextMatching()
 	}
 	return s.nextMatching.IsPresent()
 }
 
-func (s *scanFileIterator) Value() (*action.AddFile, error) {
-	if !s.Next() {
-		return nil, eris.New("NoSuchElementException")
+func (s *scanFileIterator) Next() (*action.AddFile, error) {
+	if !s.hasNext() {
+		return nil, io.EOF
 	}
 	// val ret = nextMatching.get
 	// nextMatching = None

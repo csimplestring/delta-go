@@ -2,6 +2,7 @@ package deltago
 
 import (
 	"encoding/json"
+	"io"
 	"sort"
 	"strings"
 
@@ -184,11 +185,9 @@ func (s *snapshotImp) loadTableProtoclAndMetadata() (*tuple.T2[*action.Protocol,
 	iter := s.memoryOptimizedLogReplay.GetReverseIterator()
 	defer iter.Close()
 
-	for iter.Next() {
-		replayTuple, err := iter.Value()
-		if err != nil {
-			return nil, err
-		}
+	var err error
+	var replayTuple *replayTuple
+	for replayTuple, err = iter.Next(); err == nil; replayTuple, err = iter.Next() {
 		a := replayTuple.act
 		switch v := a.(type) {
 		case *action.Protocol:
@@ -208,6 +207,9 @@ func (s *snapshotImp) loadTableProtoclAndMetadata() (*tuple.T2[*action.Protocol,
 				}
 			}
 		}
+	}
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
 	if protocol == nil {
@@ -232,16 +234,15 @@ func (s *snapshotImp) loadInMemory(files []string) ([]*action.SingleAction, erro
 				return nil, err
 			}
 
-			for iter.Next() {
-				s, err := iter.Value()
-				if err != nil {
-					return nil, err
-				}
+			for s, err := iter.Next(); err == nil; s, err = iter.Next() {
 				action := &action.SingleAction{}
 				if err := json.Unmarshal([]byte(s), &action); err != nil {
 					return nil, eris.Wrap(err, "")
 				}
 				actions = append(actions, action)
+			}
+			if err != nil && err != io.EOF {
+				return nil, err
 			}
 			iter.Close()
 		} else if strings.HasSuffix(f, "parquet") {
@@ -249,13 +250,11 @@ func (s *snapshotImp) loadInMemory(files []string) ([]*action.SingleAction, erro
 			if err != nil {
 				return nil, err
 			}
-			for iter.Next() {
-				s, err := iter.Value()
-				if err != nil {
-					return nil, err
-				}
-
+			for s, err := iter.Next(); err == nil; s, err = iter.Next() {
 				actions = append(actions, s.Wrap())
+			}
+			if err != nil && err != io.EOF {
+				return nil, err
 			}
 			iter.Close()
 		}
@@ -264,7 +263,7 @@ func (s *snapshotImp) loadInMemory(files []string) ([]*action.SingleAction, erro
 }
 
 func (s *snapshotImp) loadState() (*snapshotState, error) {
-	replay := NewInMemoryLogReplayer(s.minFileRetentionTimestamp, s.config.StorageConfig)
+	replay := NewInMemoryLogReplayer(s.minFileRetentionTimestamp, s.config.StoreType)
 	singleActions, err := s.loadInMemory(s.files())
 	if err != nil {
 		return nil, err
@@ -274,7 +273,10 @@ func (s *snapshotImp) loadState() (*snapshotState, error) {
 	for i, sa := range singleActions {
 		actions[i] = sa.Unwrap()
 	}
-	replay.Append(0, iter.FromSlice(actions))
+
+	if err := replay.Append(0, iter.FromSlice(actions)); err != nil {
+		return nil, err
+	}
 
 	if replay.currentProtocolVersion == nil {
 		return nil, errno.ActionNotFound("protocl", s.version)

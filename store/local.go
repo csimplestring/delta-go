@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"os"
@@ -8,117 +9,132 @@ import (
 	"strings"
 	"sync"
 
-	linq "github.com/ahmetb/go-linq/v3"
 	"github.com/rotisserie/eris"
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/fileblob"
 
-	deltaErrors "github.com/csimplestring/delta-go/errno"
+	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/iter"
 )
 
+func buildLocalUrl(logDirUrl string) (string, error) {
+	p, err := url.Parse(logDirUrl)
+	if err != nil {
+		return "", eris.Wrap(err, "could not parse local log dir url")
+	}
+	q := p.Query()
+	q.Set("create_dir", "true")
+	q.Set("metadata", "skip")
+	p.RawQuery = q.Encode()
+
+	return p.String(), nil
+}
+
+func NewFileLogStore(logDirUrl string) (*LocalStore, error) {
+	// logDir is like: file://a/b/c
+	urlstr, err := buildLocalUrl(logDirUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	bucket, err := blob.OpenBucket(context.Background(), urlstr)
+	if err != nil {
+		return nil, err
+	}
+	// remove file:// protocol
+	logDir := strings.TrimPrefix(logDirUrl, "file://")
+	s := &baseStore{
+		logDir: logDirUrl,
+		bucket: bucket,
+	}
+	return &LocalStore{
+		logPath: logDir,
+		s:       s,
+	}, nil
+
+}
+
 type LocalStore struct {
-	LogPath string
+	logPath string
+	s       *baseStore
 	mu      sync.Mutex
 }
 
-func (l *LocalStore) Root() string { return l.LogPath }
+func (l *LocalStore) Root() string {
+	//return l.LogPath
+	return ""
+}
 
 func (l *LocalStore) ResolvePathOnPhysicalStore(path string) (string, error) {
+	path = strings.TrimPrefix(path, "file://")
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
 
-	p, err := url.Parse(path)
-	if err != nil {
-		return "", err
-	}
-	// path is like "file:///a/b/c"
-	if len(p.Scheme) > 0 {
-		// remove "file://"
-		p.Scheme = ""
-		return p.String(), nil
-	}
-	// path is like "/a/b/c
-	if filepath.IsAbs(path) {
-		return path, nil
+	// relative path
+	if dir == "." {
+		return base, nil
 	}
 
-	return filepath.Join(l.LogPath, path), nil
+	cleanLogPath := strings.TrimSuffix(l.logPath, "/")
+	cleanDir := strings.TrimSuffix(dir, "/")
+	if cleanLogPath != cleanDir {
+		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", l.logPath, dir)
+	}
+	return base, nil
 }
 
 func (l *LocalStore) Read(path string) (iter.Iter[string], error) {
-	path, _ = l.ResolvePathOnPhysicalStore(path)
-
-	file, err := os.Open(path)
+	path, err := l.ResolvePathOnPhysicalStore(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, deltaErrors.FileNotFound(path)
-		}
-		return nil, eris.Wrap(err, "local store read "+path)
+		return nil, err
 	}
 
-	return iter.FromReadCloser(file), nil
+	return l.s.Read(path)
 }
 
 func (l *LocalStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
-	path, _ = l.ResolvePathOnPhysicalStore(path)
-
-	parent, startFile := filepath.Split(path)
-	stats, err := os.ReadDir(parent)
+	path, err := l.ResolvePathOnPhysicalStore(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, deltaErrors.FileNotFound(path)
-		}
-		return nil, eris.Wrap(err, "local store list "+parent)
+		return nil, err
 	}
 
-	var res []*FileMeta
-	linq.From(stats).Where(func(x interface{}) bool {
-		n := x.(os.DirEntry)
-		return !n.IsDir() && strings.Compare(n.Name(), startFile) >= 0
-	}).Select(func(x interface{}) interface{} {
-		n := x.(os.DirEntry)
-		info, _ := n.Info()
-		return &FileMeta{
-			path:         filepath.Join(parent, n.Name()),
-			timeModified: info.ModTime(),
-			size:         uint64(info.Size()),
-		}
-	}).Sort(func(i, j interface{}) bool {
-		return strings.Compare(i.(*FileMeta).path, j.(*FileMeta).path) < 0
-	}).ToSlice(&res)
-
-	return iter.FromSlice(res), nil
+	return l.s.ListFrom(path)
 }
 
 func (l *LocalStore) Write(path string, iter iter.Iter[string], overwrite bool) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	path, _ = l.ResolvePathOnPhysicalStore(path)
-
-	if !overwrite {
-		if _, err := os.Stat(path); err == nil {
-			return deltaErrors.FileAlreadyExists(path)
-		}
-	}
-
-	w, err := newAtomicWriter(path)
+	path, err := l.ResolvePathOnPhysicalStore(path)
 	if err != nil {
 		return err
 	}
 
-	for iter.Next() {
-		line, err := iter.Value()
-		if err != nil {
-			return err
-		}
+	if !overwrite {
 
-		w.Write([]byte(line + "\n"))
+		exist, err := l.s.bucket.Exists(context.Background(), path)
+		if err != nil {
+			return eris.Wrap(err, "something wrong when checking for existence of "+path)
+		}
+		if exist {
+			return errno.FileAlreadyExists(path)
+		}
 	}
 
-	return w.Close()
+	return l.s.Write(path, iter, overwrite)
 }
 
 func (l *LocalStore) IsPartialWriteVisible(path string) bool {
 	// rename is used for atomicity write
 	return false
+}
+
+func (l *LocalStore) Exists(path string) (bool, error) {
+	return l.s.Exists(path)
+}
+
+func (l *LocalStore) Create(path string) error {
+	return l.s.Create(path)
 }
 
 type atomicWriter struct {

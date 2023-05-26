@@ -10,7 +10,6 @@ import (
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
-	"github.com/otiai10/copy"
 	"github.com/repeale/fp-go"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,9 +38,9 @@ type timeTravelFixture struct {
 
 func newTimeTravelFixture() *timeTravelFixture {
 
-	v0 := getTestDirDataFile(getTestTableDir("time-travel-start"))
-	v1 := getTestDirDataFile(getTestTableDir("time-travel-start-start20"))
-	v2 := getTestDirDataFile(getTestTableDir("time-travel-start-start20-start40"))
+	v0 := getTestDirDataFile(getTestFileDir("time-travel-start"))
+	v1 := getTestDirDataFile(getTestFileDir("time-travel-start-start20"))
+	v2 := getTestDirDataFile(getTestFileDir("time-travel-start-start20-start40"))
 
 	return &timeTravelFixture{
 		start:             1540415658000,
@@ -66,52 +65,50 @@ func (f *timeTravelFixture) verifyTimeTravelSnapshot(t *testing.T, s Snapshot, e
 }
 
 func TestLog_time_travel_versionAsOf(t *testing.T) {
-	srcTableDir := getTestTableDir("time-travel-start-start20-start40")
-	srcTableDir = strings.TrimPrefix(srcTableDir, "file://")
-	destTableDir, err := os.MkdirTemp("", "deltago")
-	assert.NoError(t, err)
-	defer os.RemoveAll(destTableDir)
 
-	err = copy.Copy(srcTableDir, destTableDir)
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	log, err := ForTable("file://"+destTableDir, getTestConfig(), &SystemClock{})
-	assert.NoError(t, err)
+			log, err := tt.copyLog("time-travel-start-start20-start40")
+			assert.NoError(t, err)
 
-	fixture := newTimeTravelFixture()
-	s0, err := log.SnapshotForVersionAsOf(0)
-	assert.NoError(t, err)
-	s1, err := log.SnapshotForVersionAsOf(1)
-	assert.NoError(t, err)
-	s2, err := log.SnapshotForVersionAsOf(2)
-	assert.NoError(t, err)
+			fixture := newTimeTravelFixture()
+			s0, err := log.SnapshotForVersionAsOf(0)
+			assert.NoError(t, err)
+			s1, err := log.SnapshotForVersionAsOf(1)
+			assert.NoError(t, err)
+			s2, err := log.SnapshotForVersionAsOf(2)
+			assert.NoError(t, err)
 
-	// Correct cases
-	fixture.verifyTimeTravelSnapshot(t, s0, fixture.dataFilesVersion0, 0)
-	fixture.verifyTimeTravelSnapshot(t, s1, fixture.dataFilesVersion1, 1)
-	fixture.verifyTimeTravelSnapshot(t, s2, fixture.dataFilesVersion2, 2)
+			// Correct cases
+			fixture.verifyTimeTravelSnapshot(t, s0, fixture.dataFilesVersion0, 0)
+			fixture.verifyTimeTravelSnapshot(t, s1, fixture.dataFilesVersion1, 1)
+			fixture.verifyTimeTravelSnapshot(t, s2, fixture.dataFilesVersion2, 2)
 
-	// Error case - version after latest commit
-	_, err = log.SnapshotForVersionAsOf(3)
-	assert.ErrorIs(t, err, errno.VersionNotExist(3, 0, 2))
+			// Error case - version after latest commit
+			_, err = log.SnapshotForVersionAsOf(3)
+			assert.ErrorIs(t, err, errno.VersionNotExist(3, 0, 2))
 
-	// Error case - version before earliest commit
-	_, err = log.SnapshotForVersionAsOf(-1)
-	assert.ErrorIs(t, err, errno.VersionNotExist(-1, 0, 2))
+			// Error case - version before earliest commit
+			_, err = log.SnapshotForVersionAsOf(-1)
+			assert.ErrorIs(t, err, errno.VersionNotExist(-1, 0, 2))
 
-	f := filenames.DeltaFile(destTableDir+"/_delta_log/", 0)
-
-	err = os.Remove(f)
-	assert.NoError(t, err)
-	_, err = log.SnapshotForVersionAsOf(0)
-	assert.ErrorIs(t, err, errno.NoReproducibleHistoryFound(destTableDir+"/_delta_log/"))
-
+			f := filenames.DeltaFile(tt.copiedDir+"/_delta_log/", 0)
+			err = tt.blobDir.DeleteFile(f)
+			assert.NoError(t, err)
+			_, err = log.SnapshotForVersionAsOf(0)
+			assert.ErrorIs(t, err, errno.NoReproducibleHistoryFound(""))
+		})
+	}
 }
 
 func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_before_timestamp(t *testing.T) {
 	f := newTimeTravelFixture()
 
-	tablePath := getTestTableDir("time-travel-start-start20-start40")
+	tablePath := getTestFileDir("time-travel-start-start20-start40")
 	logDir := strings.TrimPrefix(tablePath, "file://") + "_delta_log/"
 	err := os.Chtimes(logDir+"00000000000000000000.json", time.Now(), time.UnixMilli(f.start))
 	assert.NoError(t, err)
@@ -120,7 +117,7 @@ func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_b
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestTable("time-travel-start-start20-start40")
+	log, err := getTestFileTable("time-travel-start-start20-start40")
 	assert.NoError(t, err)
 
 	s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 10).UnixMilli())
@@ -135,7 +132,7 @@ func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_b
 func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testing.T) {
 	f := newTimeTravelFixture()
 
-	tablePath := getTestTableDir("time-travel-start-start20-start40")
+	tablePath := getTestFileDir("time-travel-start-start20-start40")
 	logDir := strings.TrimPrefix(tablePath, "file://") + "_delta_log/"
 	err := os.Chtimes(logDir+"00000000000000000000.json", time.Now(), time.UnixMilli(f.start))
 	assert.NoError(t, err)
@@ -144,7 +141,7 @@ func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testi
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestTable("time-travel-start-start20-start40")
+	log, err := getTestFileTable("time-travel-start-start20-start40")
 	assert.NoError(t, err)
 
 	_, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 50).UnixMilli())
@@ -157,7 +154,7 @@ func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testi
 func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T) {
 	f := newTimeTravelFixture()
 
-	tablePath := getTestTableDir("time-travel-start-start20-start40")
+	tablePath := getTestFileDir("time-travel-start-start20-start40")
 	logDir := strings.TrimPrefix(tablePath, "file://") + "_delta_log/"
 	err := os.Chtimes(logDir+"00000000000000000000.json", time.Now(), time.UnixMilli(f.start))
 	assert.NoError(t, err)
@@ -166,7 +163,7 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestTable("time-travel-start-start20-start40")
+	log, err := getTestFileTable("time-travel-start-start20-start40")
 	assert.NoError(t, err)
 
 	s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).UnixMilli())
@@ -183,16 +180,25 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 }
 
 func TestLog_time_travel_with_schema_changes_should_instantiate_old_schema(t *testing.T) {
-	tablePath := getTestTableDir("time-travel-schema-changes-a")
-	orig_schema_data_files := getTestDirDataFile(tablePath)
 
-	log, err := getTestTable("time-travel-schema-changes-b")
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file", "azblob") {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer tt.clean()
 
-	f := newTimeTravelFixture()
-	s, err := log.SnapshotForVersionAsOf(0)
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, orig_schema_data_files, 0)
+			tablePath := getTestFileDir("time-travel-schema-changes-a")
+			orig_schema_data_files := getTestDirDataFile(tablePath)
+
+			log, err := tt.getLog("time-travel-schema-changes-b")
+			assert.NoError(t, err)
+
+			f := newTimeTravelFixture()
+			s, err := log.SnapshotForVersionAsOf(0)
+			assert.NoError(t, err)
+			f.verifyTimeTravelSnapshot(t, s, orig_schema_data_files, 0)
+		})
+	}
 }
 
 func TestLog_time_travel_with_partition_changes_should_instantiate_old_schema(t *testing.T) {
@@ -216,13 +222,13 @@ func TestLog_time_travel_with_partition_changes_should_instantiate_old_schema(t 
 	}
 
 	// write data to a table with some original partition
-	tablePath := getTestTableDir("time-travel-partition-changes-a")
+	tablePath := getTestFileDir("time-travel-partition-changes-a")
 	orig_partition_data_files := getPartitionDirDataFiles(strings.TrimPrefix(tablePath, "file://"))
 
 	// then append more data to that "same" table using a different partition
 	// reading version 0 should show only the original partition data files
 
-	log, err := getTestTable("time-travel-partition-changes-b")
+	log, err := getTestFileTable("time-travel-partition-changes-b")
 	assert.NoError(t, err)
 
 	s, err := log.SnapshotForVersionAsOf(0)

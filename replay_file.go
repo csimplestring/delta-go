@@ -3,6 +3,7 @@ package deltago
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -24,12 +25,8 @@ type customJSONIterator struct {
 	iter iter.Iter[string]
 }
 
-func (r *customJSONIterator) Next() bool {
-	return r.iter.Next()
-}
-
-func (r *customJSONIterator) Value() (*replayTuple, error) {
-	str, err := r.iter.Value()
+func (r *customJSONIterator) Next() (*replayTuple, error) {
+	str, err := r.iter.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -54,12 +51,8 @@ type customParquetIterator struct {
 	iter iter.Iter[action.Action]
 }
 
-func (c *customParquetIterator) Next() bool {
-	return c.iter.Next()
-}
-
-func (c *customParquetIterator) Value() (*replayTuple, error) {
-	a, err := c.iter.Value()
+func (c *customParquetIterator) Next() (*replayTuple, error) {
+	a, err := c.iter.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +95,35 @@ type logReplayIterator struct {
 	actionIter       mo.Option[iter.Iter[*replayTuple]]
 }
 
+func (l *logReplayIterator) Next() (*replayTuple, error) {
+	if l.actionIter.IsAbsent() {
+		it, err := l.getNextIter()
+		if err != nil {
+			return nil, err
+		}
+		l.actionIter = mo.Some(it)
+	}
+
+	r, err := l.actionIter.MustGet().Next()
+	if err != nil {
+		if err != io.EOF {
+			return nil, err
+		}
+		// reach end of file, close
+		if err := l.actionIter.MustGet().Close(); err != nil {
+			return nil, err
+		}
+		// continue to call next file
+		l.actionIter = mo.None[iter.Iter[*replayTuple]]()
+		return l.Next()
+	}
+
+	return r, nil
+}
+
 func (l *logReplayIterator) getNextIter() (iter.Iter[*replayTuple], error) {
 
-	nextFile, err := l.reverseFilesIter.Value()
+	nextFile, err := l.reverseFilesIter.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -120,57 +139,57 @@ func (l *logReplayIterator) getNextIter() (iter.Iter[*replayTuple], error) {
 	}
 }
 
-func (l *logReplayIterator) ensureNextIterReady() error {
-	if l.actionIter.IsPresent() && l.actionIter.MustGet().Next() {
-		return nil
-	}
+// func (l *logReplayIterator) ensureNextIterReady() error {
+// 	if l.actionIter.IsPresent() && l.actionIter.MustGet().Next() {
+// 		return nil
+// 	}
 
-	if l.actionIter.IsPresent() {
-		if err := l.actionIter.MustGet().Close(); err != nil {
-			return err
-		}
-	}
+// 	if l.actionIter.IsPresent() {
+// 		if err := l.actionIter.MustGet().Close(); err != nil {
+// 			return err
+// 		}
+// 	}
 
-	l.actionIter = mo.None[iter.Iter[*replayTuple]]()
+// 	l.actionIter = mo.None[iter.Iter[*replayTuple]]()
 
-	for l.reverseFilesIter.Next() {
-		fiter, err := l.getNextIter()
-		if err != nil {
-			return err
-		}
-		l.actionIter = mo.Some(fiter)
+// 	for l.reverseFilesIter.Next() {
+// 		fiter, err := l.getNextIter()
+// 		if err != nil {
+// 			return err
+// 		}
+// 		l.actionIter = mo.Some(fiter)
 
-		if l.actionIter.MustGet().Next() {
-			return nil
-		}
+// 		if l.actionIter.MustGet().Next() {
+// 			return nil
+// 		}
 
-		if err := l.actionIter.MustGet().Close(); err != nil {
-			return err
-		}
+// 		if err := l.actionIter.MustGet().Close(); err != nil {
+// 			return err
+// 		}
 
-		l.actionIter = mo.None[iter.Iter[*replayTuple]]()
-	}
+// 		l.actionIter = mo.None[iter.Iter[*replayTuple]]()
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (l *logReplayIterator) Next() bool {
-	if err := l.ensureNextIterReady(); err != nil {
-		return false
-	}
+// func (l *logReplayIterator) Next() bool {
+// 	if err := l.ensureNextIterReady(); err != nil {
+// 		return false
+// 	}
 
-	return l.actionIter.IsPresent()
-}
+// 	return l.actionIter.IsPresent()
+// }
 
-func (l *logReplayIterator) Value() (*replayTuple, error) {
-	if !l.Next() {
-		return nil, eris.New("no element")
-	}
-	if l.actionIter.IsAbsent() {
-		return nil, eris.New("impossible")
-	}
-	return l.actionIter.MustGet().Value()
-}
+// func (l *logReplayIterator) Value() (*replayTuple, error) {
+// 	if !l.Next() {
+// 		return nil, eris.New("no element")
+// 	}
+// 	if l.actionIter.IsAbsent() {
+// 		return nil, eris.New("impossible")
+// 	}
+// 	return l.actionIter.MustGet().Value()
+// }
 
 func (l *logReplayIterator) Close() error {
 	if l.actionIter.IsPresent() {

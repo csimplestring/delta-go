@@ -1,6 +1,7 @@
 package deltago
 
 import (
+	"io"
 	"strings"
 	"sync"
 
@@ -54,21 +55,16 @@ type Log interface {
 // ForTable Create a DeltaLog instance representing the table located at the provided path.
 func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 	logPath := strings.TrimRight(dataPath, "/") + "/_delta_log/"
+
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
-	var fs store.FS
 
 	logStore, err := store.New(logPath)
 	if err != nil {
 		return nil, err
 	}
 
-	fs, err = store.GetFileSystem(logPath)
-	if err != nil {
-		return nil, err
-	}
-
-	parquetReader, err := newCheckpointReader(config)
+	parquetReader, err := newCheckpointReader(logPath)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +80,6 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 		logPath:        logPath,
 		clock:          clock,
 		store:          logStore,
-		fs:             fs,
 		deltaLogLock:   deltaLogLock,
 		history:        historyManager,
 		snapshotReader: snaptshotManager,
@@ -93,12 +88,51 @@ func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
 	return logImpl, nil
 }
 
+// func ForTableV2(config Config, clock Clock) (Log, error) {
+// 	deltaLogLock := &sync.Mutex{}
+// 	var logStore store.Store
+// 	var fs store.FS
+
+// 	logStore, err := configureLogStore(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	fs, err = store.GetFileSystem(logPath)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	parquetReader, err := newCheckpointReader(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	historyManager := &historyManager{logStore: logStore}
+// 	snaptshotManager, err := newSnapshotReader(config, parquetReader, logStore, clock, historyManager, deltaLogLock)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	logImpl := &logImpl{
+// 		dataPath:       dataPath,
+// 		logPath:        logPath,
+// 		clock:          clock,
+// 		store:          logStore,
+// 		fs:             fs,
+// 		deltaLogLock:   deltaLogLock,
+// 		history:        historyManager,
+// 		snapshotReader: snaptshotManager,
+// 	}
+
+// 	return logImpl, nil
+// }
+
 type logImpl struct {
 	dataPath       string
 	logPath        string
 	clock          Clock
 	store          store.Store
-	fs             store.FS
 	deltaLogLock   *sync.Mutex
 	history        *historyManager
 	snapshotReader *SnapshotReader
@@ -128,7 +162,7 @@ func (l *logImpl) StartTransaction() (OptimisticTransaction, error) {
 		return nil, err
 	}
 	return newOptimisticTransaction(snapshot,
-		l.snapshotReader, l.clock, l.fs, nil, l.deltaLogLock, l.store, l.logPath), nil
+		l.snapshotReader, l.clock, nil, l.deltaLogLock, l.store, l.logPath), nil
 }
 
 func (l *logImpl) CommitInfoAt(version int64) (*action.CommitInfo, error) {
@@ -158,14 +192,13 @@ func (l *logImpl) Changes(startVersion int64, failOnDataLoss bool) (iter.Iter[Ve
 	defer fs.Close()
 
 	var deltaPaths []string
-	for fs.Next() {
-		f, err := fs.Value()
-		if err != nil {
-			return nil, err
-		}
+	for f, err := fs.Next(); err == nil; f, err = fs.Next() {
 		if filenames.IsDeltaFile(f.Path()) {
 			deltaPaths = append(deltaPaths, f.Path())
 		}
+	}
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
 	lastSeenVersion := startVersion - 1

@@ -46,6 +46,10 @@ type Store interface {
 
 	// Whether a partial write is visible for the underlying file system of `path`.
 	IsPartialWriteVisible(path string) bool
+
+	Exists(path string) (bool, error)
+
+	Create(path string) error
 }
 
 type FileMeta struct {
@@ -73,13 +77,10 @@ func New(path string) (Store, error) {
 	}
 
 	if p.Scheme == "file" {
-		p.Scheme = ""
-		v := p.String()
-		return &LocalStore{
-
-			LogPath: v,
-		}, nil
+		return NewFileLogStore(path)
+	} else if p.Scheme == "azblob" {
+		return NewAzureBlobLogStore(path)
 	}
 
-	return nil, errno.UnsupportedFileSystem(path)
+	return nil, errno.UnsupportedFileSystem("unsupported schema " + path + " to create log store")
 }

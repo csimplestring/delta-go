@@ -1,6 +1,8 @@
 package iter
 
 import (
+	"io"
+
 	"github.com/rotisserie/eris"
 )
 
@@ -11,18 +13,14 @@ type SliceIter[T any] struct {
 	i       int
 }
 
-func (a *SliceIter[T]) Next() bool {
-	return a.i < len(a.actions)
-}
-
-func (a *SliceIter[T]) Value() (T, error) {
+func (a *SliceIter[T]) Next() (T, error) {
 	var item T
 	if a.i < len(a.actions) {
 		item = a.actions[a.i]
 		a.i++
 		return item, nil
 	}
-	return item, nil
+	return item, io.EOF
 }
 
 func (a *SliceIter[T]) Close() error {
@@ -40,15 +38,17 @@ func ToSlice[T any](iter Iter[T]) ([]T, error) {
 	if iter == nil {
 		return nil, eris.New("nil iterator")
 	}
+	defer iter.Close()
 
 	var s []T
-	for iter.Next() {
-		item, err := iter.Value()
-		if err != nil {
-			return nil, err
-		}
+	var item T
+	var err error
+	for item, err = iter.Next(); err == nil; item, err = iter.Next() {
 		s = append(s, item)
 	}
-	iter.Close()
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
 	return s, nil
 }

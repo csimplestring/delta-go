@@ -1,15 +1,19 @@
 package deltago
 
 import (
-	"os"
+	"context"
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
+
 	pq "github.com/fraugster/parquet-go"
-	"github.com/fraugster/parquet-go/floor"
+	"github.com/fraugster/parquet-go/floor/interfaces"
 	parq "github.com/fraugster/parquet-go/parquet"
 	"github.com/fraugster/parquet-go/parquetschema"
 	"github.com/rotisserie/eris"
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/azureblob"
+	_ "gocloud.dev/blob/fileblob"
 )
 
 type parquetActionWriter interface {
@@ -18,30 +22,31 @@ type parquetActionWriter interface {
 	Close() error
 }
 
-type parquetActionWriterConfig struct {
-	Local *parquetActionLocalWriterConfig
-}
-
-type parquetActionLocalWriterConfig struct {
-}
-
-func newParquetActionWriter(config *parquetActionWriterConfig) parquetActionWriter {
-	if config.Local != nil {
-		return &localParquetActionWriter{}
+func newParquetActionWriter(urlstr string) (parquetActionWriter, error) {
+	b, err := blob.OpenBucket(context.Background(), urlstr)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return &defaultParquetActionWriter{
+		bucket: b,
+	}, nil
 }
 
-// localParquetActionWriter uses os.Rename to achive the atomic writes.
-type localParquetActionWriter struct {
-	name     string
-	tempName string
-	fw       *floor.Writer
+// defaultParquetActionWriter uses os.Rename to achive the atomic writes.
+type defaultParquetActionWriter struct {
+	name   string
+	bucket *blob.Bucket
+	bw     *blob.Writer
+	fw     *pq.FileWriter
 }
 
-func (l *localParquetActionWriter) Open(path string, schemaString string) error {
+func (l *defaultParquetActionWriter) Open(path string, schemaString string) error {
 
-	if _, err := os.Stat(path); err == nil {
+	exists, err := l.bucket.Exists(context.Background(), path)
+	if err != nil {
+		return err
+	}
+	if exists {
 		return errno.FileAlreadyExists(path)
 	}
 
@@ -50,43 +55,43 @@ func (l *localParquetActionWriter) Open(path string, schemaString string) error 
 		return eris.Wrap(err, "parsing schema definition")
 	}
 
-	tempFile, err := os.CreateTemp(os.TempDir(), l.name)
-	if err != nil {
-		return eris.Wrap(err, l.name)
-	}
-
-	l.name = path
-	l.tempName = tempFile.Name()
-
-	fw, err := floor.NewFileWriter(tempFile.Name(),
-		pq.WithSchemaDefinition(schema),
-		pq.WithCompressionCodec(parq.CompressionCodec_SNAPPY),
-	)
+	bw, err := l.bucket.NewWriter(context.Background(), path, nil)
 	if err != nil {
 		return err
 	}
+
+	fw := pq.NewFileWriter(bw,
+		pq.WithSchemaDefinition(schema),
+		pq.WithCompressionCodec(parq.CompressionCodec_SNAPPY))
+
+	l.name = path
 	l.fw = fw
+	l.bw = bw
 
 	return nil
 }
 
-func (l *localParquetActionWriter) Write(a *action.SingleAction) error {
-	if err := l.fw.Write(&actionMarshaller{a: a}); err != nil {
+func (l *defaultParquetActionWriter) Write(a *action.SingleAction) error {
+	obj := interfaces.NewMarshallObjectWithSchema(nil, l.fw.GetSchemaDefinition())
+	am := &actionMarshaller{a: a}
+	if err := am.MarshalParquet(obj); err != nil {
+		return err
+	}
+
+	if err := l.fw.AddData(obj.GetData()); err != nil {
 		return eris.Wrap(err, "local parquet writer writing")
 	}
 	return nil
 }
 
-func (l *localParquetActionWriter) Close() error {
+func (l *defaultParquetActionWriter) Close() error {
 
 	if err := l.fw.Close(); err != nil {
-		return eris.Wrap(err, "close error")
+		return eris.Wrap(err, "parquet file writer close error")
 	}
-	if err := os.Rename(l.tempName, l.name); err != nil {
-		return eris.Wrap(err, "rename error")
+	if err := l.bw.Close(); err != nil {
+		return eris.Wrap(err, "parquet blob writer close error")
 	}
-	if err := os.RemoveAll(l.tempName); err != nil {
-		return eris.Wrap(err, "remove error")
-	}
+
 	return nil
 }

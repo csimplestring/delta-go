@@ -5,13 +5,9 @@ type MapIter[T any, R any] struct {
 	Mapper func(t T) (R, error)
 }
 
-func (d *MapIter[T, R]) Next() bool {
-	return d.It.Next()
-}
-
-func (d *MapIter[T, R]) Value() (R, error) {
+func (d *MapIter[T, R]) Next() (R, error) {
 	var res R
-	t, err := d.It.Value()
+	t, err := d.It.Next()
 	if err != nil {
 		return res, err
 	}
