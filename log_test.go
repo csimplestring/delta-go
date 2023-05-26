@@ -132,6 +132,19 @@ func (t *testLogCase) copyLog(name string) (Log, error) {
 	return ForTable(fmt.Sprintf("%s&prefix=%s", t.urlstr, dir), t.config, &SystemClock{})
 }
 
+func (t *testLogCase) cleanTempDir() {
+	if len(t.tempDir) != 0 {
+		if err := t.blobDir.Delete(t.tempDir, []string{t.tempFile}, true); err != nil {
+			panic(err)
+		}
+	}
+	if len(t.copiedFiles) != 0 {
+		if err := t.blobDir.Delete(t.copiedDir, t.copiedFiles, true); err != nil {
+			panic(err)
+		}
+	}
+}
+
 func (t *testLogCase) clean() {
 	if len(t.tempDir) != 0 {
 		if err := t.blobDir.Delete(t.tempDir, []string{t.tempFile}, true); err != nil {
@@ -846,6 +859,7 @@ func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
 	for _, tt := range newTestLogCases("file", "azblob") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			defer tt.clean()
 
 			inputs := []tuple.T2[[]string, []string]{
@@ -871,6 +885,8 @@ func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
 				if len(missingPartCols) > 0 {
 					assert.ErrorIs(t, trx.UpdateMetadata(metadata), errno.ErrDeltaStandalone)
 				}
+				// clean up temporary
+				tt.cleanTempDir()
 			}
 		})
 	}
