@@ -1,0 +1,15 @@
+FROM fsouza/fake-gcs-server
+
+RUN apk update && \
+    apk --no-cache add py3-pip && \
+    apk add --virtual=build gcc libffi-dev musl-dev python3-dev && \
+    pip3 install --upgrade pip && \
+    pip3 install google-cloud-storage==1.31.2
+
+# Copy init_azurite.py script
+COPY ./init_gcs.py init_gcs.py
+
+# Copy local blobs to azurite
+COPY ./tests /docker-entrypoint-init-storage
+
+ENTRYPOINT []
