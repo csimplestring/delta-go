@@ -124,7 +124,7 @@ func checkTrx(
 func TestTrx_apend_apend(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -159,7 +159,7 @@ func TestTrx_apend_apend(t *testing.T) {
 func TestTrx_disjoint_txns(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -197,7 +197,7 @@ func TestTrx_disjoint_txns(t *testing.T) {
 func TestTrx_disjoint_delete_reads(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -235,7 +235,7 @@ func TestTrx_disjoint_delete_reads(t *testing.T) {
 func TestTrx_disjoint_add_reads(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -272,7 +272,7 @@ func TestTrx_disjoint_add_reads(t *testing.T) {
 func TestTrx_add_rea_no_write(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -309,7 +309,7 @@ func TestTrx_add_rea_no_write(t *testing.T) {
 func TestTrx_delete_delete(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -343,7 +343,7 @@ func TestTrx_delete_delete(t *testing.T) {
 func TestTrx_add_read_write(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -381,7 +381,7 @@ func TestTrx_add_read_write(t *testing.T) {
 func TestTrx_delete_read(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -419,7 +419,7 @@ func TestTrx_delete_read(t *testing.T) {
 func TestTrx_schema_change(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -464,7 +464,7 @@ func TestTrx_schema_change(t *testing.T) {
 func TestTrx_conflicting_txns(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -504,7 +504,7 @@ func TestTrx_conflicting_txns(t *testing.T) {
 func TestTrx_upgrade_upgrade(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -544,7 +544,7 @@ func TestTrx_upgrade_upgrade(t *testing.T) {
 func TestTrx_taint_whole_table(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -588,7 +588,7 @@ func TestTrx_taint_whole_table(t *testing.T) {
 func TestTrx_taint_whole_table_concurrent_remove(t *testing.T) {
 	f := newTrxTestFixture()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -664,7 +664,7 @@ func TestTrx_can_change_schema_to_valid_schema(t *testing.T) {
 // }
 
 func TestTrx_relative_path_is_unchanged(t *testing.T) {
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -697,7 +697,7 @@ func TestTrx_relative_path_is_unchanged(t *testing.T) {
 
 // func TestTrx_absolute_path_is_unaltered_and_made_fully_qualified_when_not_in_table_path(t *testing.T) {
 
-// 	for _, tt := range newTestLogCases("file", "azblob") {
+// 	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 // 		tt := tt
 // 		t.Run(tt.name, func(t *testing.T) {
 // 			t.Parallel()

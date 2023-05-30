@@ -80,6 +80,8 @@ func New(path string) (Store, error) {
 		return NewFileLogStore(path)
 	} else if p.Scheme == "azblob" {
 		return NewAzureBlobLogStore(path)
+	} else if p.Scheme == "gs" {
+		return NewGCSLogStore(path)
 	}
 
 	return nil, errno.UnsupportedFileSystem("unsupported schema " + path + " to create log store")

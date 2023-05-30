@@ -1,14 +1,33 @@
 package store
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/csimplestring/delta-go/iter"
 	"github.com/stretchr/testify/assert"
 	_ "gocloud.dev/blob/fileblob"
+	_ "gocloud.dev/blob/gcsblob"
 )
+
+func TestGCSStore_ListFrom(t *testing.T) {
+	os.Setenv("STORAGE_EMULATOR_HOST", "localhost:4443")
+
+	l, err := NewGCSLogStore("gs://golden?prefix=checkpoint")
+	assert.NoError(t, err)
+
+	l.s.bucket.Delete(context.Background(), "w-test.txt")
+
+	err = l.Write("w-test.txt", iter.FromSlice([]string{"a"}), false)
+	assert.NoError(t, err)
+
+	err = l.Write("w-test.txt", iter.FromSlice([]string{"a"}), false)
+	assert.Error(t, err)
+
+}
 
 func TestLocalStore_ListFrom(t *testing.T) {
 	p, err := filepath.Abs("../tests/golden/checkpoint/_delta_log/")

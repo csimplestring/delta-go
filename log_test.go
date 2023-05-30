@@ -3,6 +3,7 @@ package deltago
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -23,6 +24,7 @@ import (
 	"github.com/csimplestring/delta-go/types"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/repeale/fp-go"
+	"github.com/rotisserie/eris"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,11 +53,11 @@ func getTestFileConfig() Config {
 	}
 }
 
-func getTestFileTable(name string) (Log, error) {
-	return ForTable(getTestFileDir(name),
-		getTestFileConfig(),
-		&SystemClock{})
-}
+// func getTestFileTable(name string) (Log, error) {
+// 	return ForTable(getTestFileDir(name),
+// 		getTestFileConfig(),
+// 		&SystemClock{})
+// }
 
 // Azure Blob log store tests
 
@@ -69,6 +71,18 @@ func getTestAzBlobBaseDir() string {
 func getTestAzBlobConfig() Config {
 	return Config{
 		StoreType: "azblob",
+	}
+}
+
+// Google Cloud Storage log store tests
+
+func getTestGoogleStorageBaseDir() string {
+	return "gs://golden"
+}
+
+func getTestGoogleStorageConfig() Config {
+	return Config{
+		StoreType: "gs",
 	}
 }
 
@@ -104,7 +118,15 @@ type testLogCase struct {
 }
 
 func (t *testLogCase) getLog(name string) (Log, error) {
-	return ForTable(fmt.Sprintf("%s&prefix=%s", t.urlstr, name), t.config, &SystemClock{})
+	p, err := url.Parse(t.urlstr)
+	if err != nil {
+		return nil, err
+	}
+	q := p.Query()
+	q.Set("prefix", name)
+	p.RawQuery = q.Encode()
+
+	return ForTable(p.String(), t.config, &SystemClock{})
 }
 
 func (t *testLogCase) getTempLog() (Log, error) {
@@ -117,7 +139,15 @@ func (t *testLogCase) getTempLog() (Log, error) {
 	t.tempDir = tempDir
 	t.tempFile = tempFile
 
-	return ForTable(fmt.Sprintf("%s&prefix=%s", t.urlstr, tempDir), t.config, &SystemClock{})
+	p, err := url.Parse(t.urlstr)
+	if err != nil {
+		return nil, err
+	}
+	q := p.Query()
+	q.Set("prefix", tempDir)
+	p.RawQuery = q.Encode()
+
+	return ForTable(p.String(), t.config, &SystemClock{})
 }
 
 func (t *testLogCase) copyLog(name string) (Log, error) {
@@ -129,7 +159,15 @@ func (t *testLogCase) copyLog(name string) (Log, error) {
 	t.copiedDir = dir
 	t.copiedFiles = files
 
-	return ForTable(fmt.Sprintf("%s&prefix=%s", t.urlstr, dir), t.config, &SystemClock{})
+	p, err := url.Parse(t.urlstr)
+	if err != nil {
+		return nil, err
+	}
+	q := p.Query()
+	q.Set("prefix", dir)
+	p.RawQuery = q.Encode()
+
+	return ForTable(p.String(), t.config, &SystemClock{})
 }
 
 func (t *testLogCase) cleanTempDir() {
@@ -162,6 +200,19 @@ func (t *testLogCase) clean() {
 	}
 }
 
+func setUrlPrefix(urlstr string, prefix string) (string, error) {
+	u, err := url.Parse(urlstr)
+	if err != nil {
+		return "", eris.Wrap(err, "Invalid data path")
+	}
+
+	q := u.Query()
+	q.Set("prefix", prefix)
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
+}
+
 func newTestLogCase(name string, baseDir string, c Config) *testLogCase {
 	blobDir, err := util.NewBlobDir(baseDir)
 	if err != nil {
@@ -186,6 +237,10 @@ func newTestLogCases(names ...string) []*testLogCase {
 			os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
 
 			cases = append(cases, newTestLogCase("azblob", getTestAzBlobBaseDir(), getTestAzBlobConfig()))
+		} else if name == "gs" {
+			os.Setenv("STORAGE_EMULATOR_HOST", "localhost:4443")
+
+			cases = append(cases, newTestLogCase("gs", getTestGoogleStorageBaseDir(), getTestGoogleStorageConfig()))
 		} else {
 			panic("unsupported test case for " + name)
 		}
@@ -220,7 +275,7 @@ func TestLog_snapshot(t *testing.T) {
 		assert.Equal(t, expectedFiles, actual)
 	}
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -301,7 +356,11 @@ func TestLog_snapshot(t *testing.T) {
 func TestLog_checkpoint(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases(
+		"file",
+		"azblob",
+		"gs",
+	) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -345,7 +404,7 @@ func TestLog_checkpoint(t *testing.T) {
 func TestLog_updateDeletedDir(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -370,7 +429,7 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 	manualUpdate := &op.Operation{Name: op.MANUALUPDATE}
 	metadata := getTestMetedata()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -401,7 +460,10 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 				assert.NoError(t, err)
 			}
 
-			table2, err := ForTable(fmt.Sprintf("%s&prefix=%s", tt.urlstr, tt.tempDir),
+			dataPath, err := setUrlPrefix(tt.urlstr, tt.tempDir)
+			assert.NoError(t, err)
+
+			table2, err := ForTable(dataPath,
 				getTestFileConfig(),
 				&SystemClock{})
 			assert.NoError(t, err)
@@ -445,7 +507,7 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -464,7 +526,10 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 			err = logImpl1.store.Create(logImpl1.logPath + LastCheckpointPath)
 			assert.NoError(t, err)
 
-			table2, err := ForTable(fmt.Sprintf("%s&prefix=%s", tt.urlstr, tt.copiedDir),
+			dataPath, err := setUrlPrefix(tt.urlstr, tt.copiedDir)
+			assert.NoError(t, err)
+
+			table2, err := ForTable(dataPath,
 				getTestFileConfig(),
 				&SystemClock{})
 			assert.NoError(t, err)
@@ -480,19 +545,11 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 
 func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
 
-	tests := []struct {
-		name     string
-		getTable func(string) (Log, error)
-	}{
-		{
-			"file table",
-			getTestFileTable,
-		},
-		// we skip the azure blob here
-	}
-	for _, tt := range tests {
+	for _, tt := range newTestLogCases("file") {
 		t.Run(tt.name, func(t *testing.T) {
-			log, err := tt.getTable("canonicalized-paths-normal-a")
+			defer tt.clean()
+
+			log, err := tt.getLog("canonicalized-paths-normal-a")
 			assert.NoError(t, err)
 
 			s, err := log.Update()
@@ -503,7 +560,7 @@ func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, 0, len(files))
 
-			log, err = tt.getTable("canonicalized-paths-normal-b")
+			log, err = tt.getLog("canonicalized-paths-normal-b")
 			assert.NoError(t, err)
 
 			s, err = log.Update()
@@ -518,35 +575,37 @@ func TestLog_paths_should_be_canonicalized_normal_characters(t *testing.T) {
 }
 
 func TestLog_paths_should_be_canonicalized_special_characters(t *testing.T) {
-	dataPath := getTestFileDir("canonicalized-paths-special-a")
-	log, err := ForTable(dataPath, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file") {
+		defer tt.clean()
 
-	s, err := log.Update()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(1), s.Version())
+		log, err := tt.getLog("canonicalized-paths-special-a")
+		assert.NoError(t, err)
 
-	files, err := s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(files))
+		s, err := log.Update()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), s.Version())
 
-	dataPath = getTestFileDir("canonicalized-paths-special-b")
-	log, err = ForTable(dataPath, getTestFileConfig(), &SystemClock{})
-	assert.NoError(t, err)
+		files, err := s.AllFiles()
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(files))
 
-	s, err = log.Update()
-	assert.NoError(t, err)
-	assert.Equal(t, int64(1), s.Version())
+		log, err = tt.getLog("canonicalized-paths-special-b")
+		assert.NoError(t, err)
 
-	files, err = s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(files))
+		s, err = log.Update()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), s.Version())
+
+		files, err = s.AllFiles()
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(files))
+	}
 }
 
 func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -590,7 +649,7 @@ func TestLog_do_not_relative_path_in_remove_files(t *testing.T) {
 func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -617,7 +676,7 @@ func TestLog_delete_and_readd_the_same_file_in_different_transactions(t *testing
 func TestLog_version_not_continuous(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -632,7 +691,7 @@ func TestLog_version_not_continuous(t *testing.T) {
 func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -648,7 +707,7 @@ func TestLog_state_reconstruction_without_action_should_fail(t *testing.T) {
 func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fail(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -665,7 +724,7 @@ func TestLog_state_reconstruction_from_checkpoint_with_missing_action_should_fai
 func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -680,7 +739,7 @@ func TestLog_table_protocol_version_greater_than_client_reader_protocol_version(
 func TestLog_get_commit_info(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -761,7 +820,11 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 		}
 	}
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases(
+		"file",
+		"azblob",
+		"gs",
+	) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -791,7 +854,7 @@ func TestLog_getChanges_no_data_loss(t *testing.T) {
 func TestLog_getChanges_data_loss(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -821,7 +884,7 @@ func TestLog_getChanges_data_loss(t *testing.T) {
 func TestLog_table_exists(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -856,7 +919,7 @@ func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
 	schemaString, err := types.ToJSON(schema)
 	assert.NoError(t, err)
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -894,7 +957,7 @@ func TestLog_schema_must_contain_all_partition_columns(t *testing.T) {
 
 func TestLog_schema_contains_no_data_columns_and_only_partition_columns(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -925,7 +988,7 @@ func TestLog_schema_contains_no_data_columns_and_only_partition_columns(t *testi
 // func TestLog_getVersionBeforeOrAtTimestamp_and_getVersionAtOrAfterTimestamp(t *testing.T) {
 // 	t.Parallel()
 
-// 	for _, tt := range newTestLogCases("file", "azblob") {
+// 	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 // 		tt := tt
 // 		t.Run(tt.name, func(t *testing.T) {
 // 			t.Parallel()
@@ -1000,15 +1063,12 @@ func TestLog_schema_contains_no_data_columns_and_only_partition_columns(t *testi
 // }
 
 func TestLog_getVersionBeforeOrAtTimestamp_and_getVersionAtOrAfterTimestamp_recoverability(t *testing.T) {
-	dir, err := os.MkdirTemp("", "delta")
-	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	logPath := dir + "/_delta_log/"
-	err = os.Mkdir(logPath, os.ModePerm)
-	assert.NoError(t, err)
+	cases := newTestLogCases("file")
+	tt := cases[0]
+	defer tt.clean()
 
-	log, err := ForTable("file://"+dir, getTestFileConfig(), &SystemClock{})
+	log, err := tt.getTempLog()
 	assert.NoError(t, err)
 
 	for i := 0; i <= 35; i++ {
@@ -1025,6 +1085,10 @@ func TestLog_getVersionBeforeOrAtTimestamp_and_getVersionAtOrAfterTimestamp_reco
 	}
 	nowEpochMs := time.Now().UnixMilli() / 1000 * 1000
 
+	u, err := url.Parse(tt.urlstr)
+	assert.NoError(t, err)
+	u.Scheme = ""
+	logPath := u.Path + "/" + tt.tempDir + "/_delta_log/"
 	for i := 0; i <= 35; i++ {
 		delta := filenames.DeltaFile(logPath, int64(i))
 		if i >= 25 {

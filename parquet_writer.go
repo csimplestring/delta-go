@@ -14,6 +14,7 @@ import (
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/azureblob"
 	_ "gocloud.dev/blob/fileblob"
+	_ "gocloud.dev/blob/gcsblob"
 )
 
 type parquetActionWriter interface {

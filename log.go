@@ -2,6 +2,7 @@ package deltago
 
 import (
 	"io"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -52,14 +53,30 @@ type Log interface {
 	TableExists() bool
 }
 
+func getLogPathUrl(dataPath string) (string, error) {
+	u, err := url.Parse(dataPath)
+	if err != nil {
+		return "", eris.Wrap(err, "Invalid data path")
+	}
+
+	q := u.Query()
+	q.Set("prefix", strings.TrimRight(q.Get("prefix"), "/")+"/_delta_log/")
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
+}
+
 // ForTable Create a DeltaLog instance representing the table located at the provided path.
 func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
-	logPath := strings.TrimRight(dataPath, "/") + "/_delta_log/"
+	logPath, err := getLogPathUrl(dataPath)
+	if err != nil {
+		return nil, err
+	}
 
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
 
-	logStore, err := store.New(logPath)
+	logStore, err = store.New(logPath)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +202,7 @@ func (l *logImpl) Changes(startVersion int64, failOnDataLoss bool) (iter.Iter[Ve
 		return nil, eris.Wrap(errno.ErrIllegalArgument, "invalid startVersion")
 	}
 
-	fs, err := l.store.ListFrom(filenames.DeltaFile(l.logPath, startVersion))
+	fs, err := l.store.ListFrom(filenames.DeltaFile("", startVersion))
 	if err != nil {
 		return nil, err
 	}
