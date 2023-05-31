@@ -2,13 +2,12 @@ package store
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 
 	"cloud.google.com/go/storage"
 	"github.com/csimplestring/delta-go/errno"
+	"github.com/csimplestring/delta-go/internal/util/path"
 	"github.com/csimplestring/delta-go/iter"
-	"github.com/rotisserie/eris"
 
 	goblob "gocloud.dev/blob"
 	_ "gocloud.dev/blob/gcsblob"
@@ -16,11 +15,18 @@ import (
 )
 
 func NewGCSLogStore(logDir string) (*GCSLogStore, error) {
-
-	bucket, err := goblob.OpenBucket(context.Background(), logDir)
+	// logDir is like: gs:///a/b/c/_delta_log/, must end with "/"
+	blobURL, err := path.ConvertToBlobURL(logDir)
 	if err != nil {
 		return nil, err
 	}
+
+	bucket, err := goblob.OpenBucket(context.Background(), blobURL)
+	if err != nil {
+		return nil, err
+	}
+
+	logDir = strings.TrimPrefix(logDir, "gs://")
 	s := &baseStore{
 		logDir: logDir,
 		bucket: bucket,
@@ -95,20 +101,8 @@ func (a *GCSLogStore) Write(path string, actions iter.Iter[string], overwrite bo
 }
 
 // Resolve the fully qualified path for the given `path`.
-func (a *GCSLogStore) ResolvePathOnPhysicalStore(pathWithoutSchema string) (string, error) {
-	pathWithoutSchema = strings.TrimPrefix(pathWithoutSchema, "gs://")
-	dir := filepath.Dir(pathWithoutSchema)
-	base := filepath.Base(pathWithoutSchema)
-
-	// relative path
-	if dir == "." {
-		return base, nil
-	}
-
-	if strings.TrimSuffix(a.logDir, "/") != strings.TrimSuffix("gs://"+dir, "/") {
-		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", a.logDir, dir)
-	}
-	return base, nil
+func (a *GCSLogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
+	return relativePath("gs", a.logDir, path)
 }
 
 // Whether a partial write is visible for the underlying file system of `path`.

@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"strings"
 
 	"github.com/csimplestring/delta-go/iter"
 	"gocloud.dev/blob"
@@ -16,8 +15,7 @@ type baseStore struct {
 }
 
 func (b *baseStore) Read(path string) (iter.Iter[string], error) {
-	// path is relative to the root log path, do NOT start with '/'
-	path = strings.TrimPrefix(path, b.logDir)
+	// path must be relative to the root log path, do NOT start with '/'
 	r, err := b.bucket.NewReader(context.Background(), path, nil)
 	if err != nil {
 		return nil, err
@@ -27,7 +25,7 @@ func (b *baseStore) Read(path string) (iter.Iter[string], error) {
 }
 
 func (b *baseStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
-	path = strings.TrimPrefix(path, b.logDir)
+	// path must be relative to the root log path, do NOT start with '/'
 	var writeOpt *blob.WriterOptions
 
 	if !overwrite {

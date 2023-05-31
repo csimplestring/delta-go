@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -11,28 +10,26 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/csimplestring/delta-go/errno"
+	"github.com/csimplestring/delta-go/internal/util/path"
 	"github.com/csimplestring/delta-go/iter"
-	"github.com/rotisserie/eris"
 
 	goblob "gocloud.dev/blob"
 	_ "gocloud.dev/blob/azureblob"
 )
 
 func NewAzureBlobLogStore(logDir string) (*AzureBlobLogStore, error) {
-	// var url string
-	// if localemu {
-	// 	url = fmt.Sprintf("azblob://%s?localemu=true&domain=localhost:10000&protocol=http&prefix=%s", container, logDir)
-	// } else {
-	// 	if _, exist := os.LookupEnv("AZURE_CONNECTION_STR"); !exist {
-	// 		return nil, eris.Errorf("AZURE_CONNECTION_STR evn var is required")
-	// 	}
-	// 	url = fmt.Sprintf("azblob://%s?prefix=%s", container, logDir)
-	// }
-
-	bucket, err := goblob.OpenBucket(context.Background(), logDir)
+	// logDir is like: azblob:///a/b/c/_delta_log/, must end with /
+	blobURL, err := path.ConvertToBlobURL(logDir)
 	if err != nil {
 		return nil, err
 	}
+
+	bucket, err := goblob.OpenBucket(context.Background(), blobURL)
+	if err != nil {
+		return nil, err
+	}
+
+	logDir = strings.TrimPrefix(logDir, "azblob://")
 	s := &baseStore{
 		logDir: logDir,
 		bucket: bucket,
@@ -107,20 +104,8 @@ func (a *AzureBlobLogStore) Write(path string, actions iter.Iter[string], overwr
 }
 
 // Resolve the fully qualified path for the given `path`.
-func (a *AzureBlobLogStore) ResolvePathOnPhysicalStore(pathWithoutSchema string) (string, error) {
-	pathWithoutSchema = strings.TrimPrefix(pathWithoutSchema, "azblob://")
-	dir := filepath.Dir(pathWithoutSchema)
-	base := filepath.Base(pathWithoutSchema)
-
-	// relative path
-	if dir == "." {
-		return base, nil
-	}
-
-	if strings.TrimSuffix(a.logDir, "/") != strings.TrimSuffix("azblob://"+dir, "/") {
-		return "", eris.Errorf("the configured log dir is %s but the provided log dir is %s", a.logDir, dir)
-	}
-	return base, nil
+func (a *AzureBlobLogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
+	return relativePath("azblob", a.logDir, path)
 }
 
 // Whether a partial write is visible for the underlying file system of `path`.
