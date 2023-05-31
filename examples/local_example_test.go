@@ -9,6 +9,17 @@ import (
 )
 
 func TestLocalExample(t *testing.T) {
+	// we should support url like: azblob://my-bucket/path/to/folder/
+	// {
+	// 	storageType: "azblob",
+	// 	container: "my-container",
+	// 	path: "/path/to/folder/",
+
+	// 	extra: {
+	// 		"localemu": "",
+	// 		// other environment variables
+	// 	}
+	// }
 	path, err := filepath.Abs("../tests/golden?prefix=snapshot-data0")
 	if err != nil {
 		log.Fatal(err)
