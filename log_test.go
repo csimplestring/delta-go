@@ -18,6 +18,7 @@ import (
 	"github.com/csimplestring/delta-go/errno"
 	"github.com/csimplestring/delta-go/internal/util"
 	"github.com/csimplestring/delta-go/internal/util/filenames"
+	"github.com/csimplestring/delta-go/internal/util/path"
 	"github.com/csimplestring/delta-go/iter"
 	"github.com/csimplestring/delta-go/op"
 	"github.com/csimplestring/delta-go/store"
@@ -44,7 +45,7 @@ func getTestFileBaseDir() string {
 	if err != nil {
 		panic(err)
 	}
-	return "file://" + path + "?metadata=skip"
+	return "file://" + path + "/"
 }
 
 func getTestFileConfig() Config {
@@ -65,7 +66,7 @@ func getTestAzBlobBaseDir() string {
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
 	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
 
-	return "azblob://golden?localemu=true&domain=localhost:10000&protocol=http"
+	return "azblob://golden"
 }
 
 func getTestAzBlobConfig() Config {
@@ -106,9 +107,10 @@ func getTestMetedata() *action.Metadata {
 type testLogCase struct {
 	name string
 
-	blobDir *util.BlobDir
-	urlstr  string
-	config  Config
+	blobDir      *util.BlobDir
+	urlstr       string
+	config       Config
+	dataPathBase string
 
 	//
 	tempFile    string
@@ -118,15 +120,9 @@ type testLogCase struct {
 }
 
 func (t *testLogCase) getLog(name string) (Log, error) {
-	p, err := url.Parse(t.urlstr)
-	if err != nil {
-		return nil, err
-	}
-	q := p.Query()
-	q.Set("prefix", name)
-	p.RawQuery = q.Encode()
+	dataPath := fmt.Sprintf("%s/%s", t.dataPathBase, name)
 
-	return ForTable(p.String(), t.config, &SystemClock{})
+	return ForTable(dataPath, t.config, &SystemClock{})
 }
 
 func (t *testLogCase) getTempLog() (Log, error) {
@@ -139,15 +135,11 @@ func (t *testLogCase) getTempLog() (Log, error) {
 	t.tempDir = tempDir
 	t.tempFile = tempFile
 
-	p, err := url.Parse(t.urlstr)
-	if err != nil {
-		return nil, err
-	}
-	q := p.Query()
-	q.Set("prefix", tempDir)
-	p.RawQuery = q.Encode()
+	base := strings.TrimSuffix(t.dataPathBase, "/")
+	dir := strings.TrimSuffix(strings.TrimPrefix(tempDir, "/"), "/")
+	dataPath := fmt.Sprintf("%s/%s", base, dir)
 
-	return ForTable(p.String(), t.config, &SystemClock{})
+	return ForTable(dataPath, t.config, &SystemClock{})
 }
 
 func (t *testLogCase) copyLog(name string) (Log, error) {
@@ -159,15 +151,9 @@ func (t *testLogCase) copyLog(name string) (Log, error) {
 	t.copiedDir = dir
 	t.copiedFiles = files
 
-	p, err := url.Parse(t.urlstr)
-	if err != nil {
-		return nil, err
-	}
-	q := p.Query()
-	q.Set("prefix", dir)
-	p.RawQuery = q.Encode()
+	dataPath := fmt.Sprintf("%s/%s", t.dataPathBase, dir)
 
-	return ForTable(p.String(), t.config, &SystemClock{})
+	return ForTable(dataPath, t.config, &SystemClock{})
 }
 
 func (t *testLogCase) cleanTempDir() {
@@ -214,16 +200,23 @@ func setUrlPrefix(urlstr string, prefix string) (string, error) {
 }
 
 func newTestLogCase(name string, baseDir string, c Config) *testLogCase {
-	blobDir, err := util.NewBlobDir(baseDir)
+	dataPathBase := baseDir
+	blobURL, err := path.ConvertToBlobURL(baseDir)
+	if err != nil {
+		panic(err)
+	}
+
+	blobDir, err := util.NewBlobDir(blobURL)
 	if err != nil {
 		panic(err)
 	}
 
 	return &testLogCase{
-		name:    name,
-		blobDir: blobDir,
-		urlstr:  baseDir,
-		config:  c,
+		name:         name,
+		blobDir:      blobDir,
+		urlstr:       blobURL,
+		config:       c,
+		dataPathBase: dataPathBase,
 	}
 }
 
@@ -235,6 +228,10 @@ func newTestLogCases(names ...string) []*testLogCase {
 		} else if name == "azblob" {
 			os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
 			os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
+			os.Setenv("AZURE_STORAGE_DOMAIN", "localhost:10000")
+			os.Setenv("AZURE_STORAGE_PROTOCOL", "http")
+			os.Setenv("AZURE_STORAGE_IS_CDN", "false")
+			os.Setenv("AZURE_STORAGE_IS_LOCAL_EMULATOR", "true")
 
 			cases = append(cases, newTestLogCase("azblob", getTestAzBlobBaseDir(), getTestAzBlobConfig()))
 		} else if name == "gs" {
@@ -405,6 +402,7 @@ func TestLog_updateDeletedDir(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -429,7 +427,10 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 	manualUpdate := &op.Operation{Name: op.MANUALUPDATE}
 	metadata := getTestMetedata()
 
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases(
+		"file",
+		"azblob", "gs",
+	) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -460,10 +461,7 @@ func TestLog_update_should_not_pick_up_delta_files_earlier_than_checkpoint(t *te
 				assert.NoError(t, err)
 			}
 
-			dataPath, err := setUrlPrefix(tt.urlstr, tt.tempDir)
-			assert.NoError(t, err)
-
-			table2, err := ForTable(dataPath,
+			table2, err := ForTable(table1.Path(),
 				getTestFileConfig(),
 				&SystemClock{})
 			assert.NoError(t, err)
@@ -526,10 +524,7 @@ func TestLog_handle_corrupted_last_checkpoint_file(t *testing.T) {
 			err = logImpl1.store.Create(logImpl1.logPath + LastCheckpointPath)
 			assert.NoError(t, err)
 
-			dataPath, err := setUrlPrefix(tt.urlstr, tt.copiedDir)
-			assert.NoError(t, err)
-
-			table2, err := ForTable(dataPath,
+			table2, err := ForTable(table.Path(),
 				getTestFileConfig(),
 				&SystemClock{})
 			assert.NoError(t, err)

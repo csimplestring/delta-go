@@ -2,7 +2,6 @@ package deltago
 
 import (
 	"io"
-	"net/url"
 	"strings"
 	"sync"
 
@@ -53,30 +52,19 @@ type Log interface {
 	TableExists() bool
 }
 
-func getLogPathUrl(dataPath string) (string, error) {
-	u, err := url.Parse(dataPath)
-	if err != nil {
-		return "", eris.Wrap(err, "Invalid data path")
-	}
-
-	q := u.Query()
-	q.Set("prefix", strings.TrimRight(q.Get("prefix"), "/")+"/_delta_log/")
-	u.RawQuery = q.Encode()
-
-	return u.String(), nil
+func getLogPath(dataPath string) string {
+	logPath := strings.TrimSuffix(dataPath, "/") + "/_delta_log/"
+	return logPath
 }
 
 // ForTable Create a DeltaLog instance representing the table located at the provided path.
 func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
-	logPath, err := getLogPathUrl(dataPath)
-	if err != nil {
-		return nil, err
-	}
+	logPath := getLogPath(dataPath)
 
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
 
-	logStore, err = store.New(logPath)
+	logStore, err := store.New(logPath)
 	if err != nil {
 		return nil, err
 	}

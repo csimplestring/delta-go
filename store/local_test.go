@@ -15,16 +15,20 @@ func TestLocalStore(t *testing.T) {
 	p, err := filepath.Abs("../tests/golden/checkpoint/_delta_log/")
 	assert.NoError(t, err)
 
-	s, err := NewFileLogStore(fmt.Sprintf("file://%s", p))
+	absPath := fmt.Sprintf("file://%s/", p)
+
+	s, err := NewFileLogStore(absPath)
 	assert.NoError(t, err)
 
-	data, err := s.Read("00000000000000000000.json")
+	// reading using absolute path
+	data, err := s.Read(absPath + "00000000000000000000.json")
 	assert.NoError(t, err)
 
 	sl, err := iter.ToSlice(data)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(sl))
 
+	// listing using the relative path
 	it, err := s.ListFrom("00000000000000000007.json")
 	assert.NoError(t, err)
 

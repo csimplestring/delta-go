@@ -5,6 +5,7 @@ import (
 
 	"github.com/csimplestring/delta-go/action"
 	"github.com/csimplestring/delta-go/errno"
+	"github.com/csimplestring/delta-go/internal/util/path"
 
 	pq "github.com/fraugster/parquet-go"
 	"github.com/fraugster/parquet-go/floor/interfaces"
@@ -24,7 +25,12 @@ type parquetActionWriter interface {
 }
 
 func newParquetActionWriter(urlstr string) (parquetActionWriter, error) {
-	b, err := blob.OpenBucket(context.Background(), urlstr)
+	blobURL, err := path.ConvertToBlobURL(urlstr)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := blob.OpenBucket(context.Background(), blobURL)
 	if err != nil {
 		return nil, err
 	}
