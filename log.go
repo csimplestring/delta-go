@@ -52,9 +52,14 @@ type Log interface {
 	TableExists() bool
 }
 
+func getLogPath(dataPath string) string {
+	logPath := strings.TrimSuffix(dataPath, "/") + "/_delta_log/"
+	return logPath
+}
+
 // ForTable Create a DeltaLog instance representing the table located at the provided path.
 func ForTable(dataPath string, config Config, clock Clock) (Log, error) {
-	logPath := strings.TrimRight(dataPath, "/") + "/_delta_log/"
+	logPath := getLogPath(dataPath)
 
 	deltaLogLock := &sync.Mutex{}
 	var logStore store.Store
@@ -185,7 +190,7 @@ func (l *logImpl) Changes(startVersion int64, failOnDataLoss bool) (iter.Iter[Ve
 		return nil, eris.Wrap(errno.ErrIllegalArgument, "invalid startVersion")
 	}
 
-	fs, err := l.store.ListFrom(filenames.DeltaFile(l.logPath, startVersion))
+	fs, err := l.store.ListFrom(filenames.DeltaFile("", startVersion))
 	if err != nil {
 		return nil, err
 	}

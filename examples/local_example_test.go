@@ -9,6 +9,7 @@ import (
 )
 
 func TestLocalExample(t *testing.T) {
+
 	path, err := filepath.Abs("../tests/golden/snapshot-data0")
 	if err != nil {
 		log.Fatal(err)

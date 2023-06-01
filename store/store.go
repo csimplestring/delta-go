@@ -2,6 +2,8 @@ package store
 
 import (
 	"net/url"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/csimplestring/delta-go/errno"
@@ -80,7 +82,41 @@ func New(path string) (Store, error) {
 		return NewFileLogStore(path)
 	} else if p.Scheme == "azblob" {
 		return NewAzureBlobLogStore(path)
+	} else if p.Scheme == "gs" {
+		return NewGCSLogStore(path)
 	}
 
 	return nil, errno.UnsupportedFileSystem("unsupported schema " + path + " to create log store")
+}
+
+func relativePath(scheme string, basePath string, path string) (string, error) {
+	rel := func(base string, path string) (string, error) {
+		relativePath, err := filepath.Rel(basePath, path)
+		if err != nil {
+			return "", eris.Wrap(err, "fail to resolve the relative path for "+path)
+		}
+		// path is not in the basePath
+		if strings.HasPrefix(relativePath, "../") {
+			return "", eris.Errorf("the path %s is not in the base path %s", path, basePath)
+		}
+		return relativePath, nil
+	}
+
+	// absolute path: "file:///path/to/file"
+	if strings.HasPrefix(path, scheme+"://") {
+		path = strings.TrimPrefix(path, scheme+"://")
+		return rel(basePath, path)
+	}
+
+	// absolute path without scheme "/path/to/a"
+	if !strings.HasPrefix(path, scheme+"://") && filepath.IsAbs(path) {
+		return rel(basePath, path)
+	}
+
+	// relative path
+	if !strings.HasPrefix(path, scheme+"://") && !filepath.IsAbs(path) {
+		return path, nil
+	}
+
+	return "", eris.Errorf("fail to resolve the relative path for %s with basePath %s", path, basePath)
 }

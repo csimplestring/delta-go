@@ -66,7 +66,7 @@ func (f *timeTravelFixture) verifyTimeTravelSnapshot(t *testing.T, s Snapshot, e
 
 func TestLog_time_travel_versionAsOf(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -117,16 +117,20 @@ func TestLog_timestampAsOf_with_timestamp_in_between_commits_should_use_commit_b
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestFileTable("time-travel-start-start20-start40")
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file") {
+		defer tt.clean()
 
-	s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 10).UnixMilli())
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion0, 0)
+		log, err := tt.getLog("time-travel-start-start20-start40")
+		assert.NoError(t, err)
 
-	s, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 30).UnixMilli())
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion1, 1)
+		s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 10).UnixMilli())
+		assert.NoError(t, err)
+		f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion0, 0)
+
+		s, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 30).UnixMilli())
+		assert.NoError(t, err)
+		f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion1, 1)
+	}
 }
 
 func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testing.T) {
@@ -141,14 +145,19 @@ func TestLog_timestampAsOf_with_timestamp_after_last_commit_should_fail(t *testi
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestFileTable("time-travel-start-start20-start40")
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file") {
+		defer tt.clean()
 
-	_, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 50).UnixMilli())
-	assert.ErrorIs(t, err, errno.ErrIllegalArgument)
-	latest := time.UnixMilli(f.start).Add(time.Minute * 40).UnixMilli()
-	usr := time.UnixMilli(f.start).Add(time.Minute * 50).UnixMilli()
-	assert.Equal(t, errno.TimestampLaterThanTableLastCommit(usr, latest).Error(), err.Error())
+		log, err := tt.getLog("time-travel-start-start20-start40")
+		assert.NoError(t, err)
+
+		_, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 50).UnixMilli())
+		assert.ErrorIs(t, err, errno.ErrIllegalArgument)
+		latest := time.UnixMilli(f.start).Add(time.Minute * 40).UnixMilli()
+		usr := time.UnixMilli(f.start).Add(time.Minute * 50).UnixMilli()
+		assert.Equal(t, errno.TimestampLaterThanTableLastCommit(usr, latest).Error(), err.Error())
+	}
+
 }
 
 func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T) {
@@ -163,25 +172,29 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 	err = os.Chtimes(logDir+"00000000000000000002.json", time.Now(), time.UnixMilli(f.start).Add(time.Minute*40))
 	assert.NoError(t, err)
 
-	log, err := getTestFileTable("time-travel-start-start20-start40")
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file") {
+		defer tt.clean()
+		log, err := tt.getLog("time-travel-start-start20-start40")
+		assert.NoError(t, err)
 
-	s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).UnixMilli())
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion0, 0)
+		s, err := log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).UnixMilli())
+		assert.NoError(t, err)
+		f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion0, 0)
 
-	s, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 20).UnixMilli())
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion1, 1)
+		s, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 20).UnixMilli())
+		assert.NoError(t, err)
+		f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion1, 1)
 
-	s, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 40).UnixMilli())
-	assert.NoError(t, err)
-	f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion2, 2)
+		s, err = log.SnapshotForTimestampAsOf(time.UnixMilli(f.start).Add(time.Minute * 40).UnixMilli())
+		assert.NoError(t, err)
+		f.verifyTimeTravelSnapshot(t, s, f.dataFilesVersion2, 2)
+	}
+
 }
 
 func TestLog_time_travel_with_schema_changes_should_instantiate_old_schema(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -228,21 +241,26 @@ func TestLog_time_travel_with_partition_changes_should_instantiate_old_schema(t 
 	// then append more data to that "same" table using a different partition
 	// reading version 0 should show only the original partition data files
 
-	log, err := getTestFileTable("time-travel-partition-changes-b")
-	assert.NoError(t, err)
+	for _, tt := range newTestLogCases("file") {
+		defer tt.clean()
 
-	s, err := log.SnapshotForVersionAsOf(0)
-	assert.NoError(t, err)
-	assert.Equal(t, int64(0), s.Version())
+		log, err := tt.getLog("time-travel-partition-changes-b")
+		assert.NoError(t, err)
 
-	files, err := s.AllFiles()
-	assert.NoError(t, err)
-	assert.Equal(t, len(orig_partition_data_files), len(files))
+		s, err := log.SnapshotForVersionAsOf(0)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), s.Version())
 
-	ok := fp.Every(func(af *action.AddFile) bool {
-		return util.Exists(orig_partition_data_files, func(e string) bool {
-			return strings.Contains(af.Path, e)
-		})
-	})(files)
-	assert.True(t, ok)
+		files, err := s.AllFiles()
+		assert.NoError(t, err)
+		assert.Equal(t, len(orig_partition_data_files), len(files))
+
+		ok := fp.Every(func(af *action.AddFile) bool {
+			return util.Exists(orig_partition_data_files, func(e string) bool {
+				return strings.Contains(af.Path, e)
+			})
+		})(files)
+		assert.True(t, ok)
+	}
+
 }

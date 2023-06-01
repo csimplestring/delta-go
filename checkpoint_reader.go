@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/csimplestring/delta-go/action"
+	"github.com/csimplestring/delta-go/internal/util/path"
 	"github.com/csimplestring/delta-go/iter"
 	goparquet "github.com/fraugster/parquet-go"
 	"github.com/fraugster/parquet-go/floor/interfaces"
@@ -11,6 +12,7 @@ import (
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/azureblob"
 	_ "gocloud.dev/blob/fileblob"
+	_ "gocloud.dev/blob/gcsblob"
 )
 
 type checkpointReader interface {
@@ -18,7 +20,12 @@ type checkpointReader interface {
 }
 
 func newCheckpointReader(urlstr string) (checkpointReader, error) {
-	b, err := blob.OpenBucket(context.Background(), urlstr)
+	blobURL, err := path.ConvertToBlobURL(urlstr)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := blob.OpenBucket(context.Background(), blobURL)
 	if err != nil {
 		return nil, err
 	}
