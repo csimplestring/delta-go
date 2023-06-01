@@ -7,16 +7,6 @@ import (
 	"github.com/rotisserie/eris"
 )
 
-type Config struct {
-
-	// azure blob, this can be controlled by env vars
-	// AZURE_STORAGE_DOMAIN, AZURE_STORAGE_PROTOCOL, AZURE_STORAGE_IS_CDN, and AZURE_STORAGE_IS_LOCAL_EMULATOR
-	AzureDomain   string
-	AzureProtocol string
-	AzureCDN      bool
-	AzureLocalemu bool
-}
-
 // From constructs
 // azblob://my-bucket/path/to/log/
 // file:///path/to/

@@ -12,54 +12,62 @@ What is it not?
 
 - It does not read, write or update the data for Delta Lake table directly, but the compute engine on top of it should do that.
 
-## Supported backends
+## Supported Log Store
 
-- Local file system (Done)
-- Azure Blob Storage (Done)
+- [x]Local file system 
+- [x]Azure Blob Storage 
+- [x]Google Cloud Storage 
+- []AWS S3
 
-## Status
-
-- Currently only the local file system is fully supported and thoroughly tested against golden table data in the official Delta Standalone repo.
-- For other cloud storage, on the roadmap, any contribution is welcome!
-
-## Usage
+## Usage Example
 
 ```go
 package examples
 
 import (
 	"log"
-	"path/filepath"
+	"os"
 	"testing"
 
 	delta "github.com/csimplestring/delta-go"
 )
 
-func main() {
-	path = "file://YOUR_DELTA_LOG_FOLDER/"
+func TestAzureBlobExample(t *testing.T) {
 
+	// Go SDK uses the environment variables AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY,
+	// and AZURE_STORAGE_SAS_TOKEN to configure the credentials. AZURE_STORAGE_ACCOUNT is required, along with one of the other two.
+
+	// this is the default credentials for Azurite Local Emulator
+	os.Setenv("AZURE_STORAGE_ACCOUNT", "devstoreaccount1")
+	os.Setenv("AZURE_STORAGE_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==")
+
+	// required the Azurite local emulator, for production, not needed
+	os.Setenv("AZURE_STORAGE_DOMAIN", "localhost:10000")
+	os.Setenv("AZURE_STORAGE_PROTOCOL", "http")
+	os.Setenv("AZURE_STORAGE_IS_CDN", "false")
+	os.Setenv("AZURE_STORAGE_IS_LOCAL_EMULATOR", "true")
+
+	// golden is the container name
+	// snapshot-data0/_delta_log/ will be the log directory
+	// the golden table test data is used in this example
+	dataPath := "azblob://golden/snapshot-data0/"
 	config := delta.Config{
-		StorageConfig: delta.StorageConfig{
-			Scheme: delta.Local,
-		},
+		StoreType: "azblob",
 	}
 
-	table, err := delta.ForTable(path, config, &delta.SystemClock{})
+	table, err := delta.ForTable(dataPath, config, &delta.SystemClock{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// get the snapshot 
 	s, err := table.Snapshot()
 	if err != nil {
 		log.Fatal(err)
 	}
-	
-	// get the log version
+
 	version := s.Version()
 	log.Println(version)
 
-	// iterate all the log files
 	files, err := s.AllFiles()
 	if err != nil {
 		log.Fatal(err)
@@ -68,8 +76,8 @@ func main() {
 		log.Println(f.Path)
 	}
 }
-
 ```
+More examples for different storage backend, see examples folder.
 
 ## Contributing
 
