@@ -14,10 +14,10 @@ What is it not?
 
 ## Supported Log Store
 
-- [x]Local file system 
-- [x]Azure Blob Storage 
-- [x]Google Cloud Storage 
-- []AWS S3
+- [x] Local file system 
+- [x] Azure Blob Storage 
+- [x] Google Cloud Storage 
+- [ ] AWS S3
 
 ## Usage Example
 
