@@ -1,5 +1,8 @@
 # Delta Go
 
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/csimplestring/delta-go/go.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/csimplestring/delta-go)](https://goreportcard.com/report/github.com/csimplestring/delta-go)
+
 ## About
 
 This repository contains a Go package that provides a connector for [Delta Lake](https://delta.io/) - an open-source storage layer that brings ACID transactions to Apache Spark big data workloads. A Go portal of the official Scala [delta standalone](https://github.com/delta-io/connectors). 
