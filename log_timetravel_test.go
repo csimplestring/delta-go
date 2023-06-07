@@ -66,7 +66,7 @@ func (f *timeTravelFixture) verifyTimeTravelSnapshot(t *testing.T, s Snapshot, e
 
 func TestLog_time_travel_versionAsOf(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs", "s3") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -194,7 +194,7 @@ func TestLog_timestampAsOf_with_timestamp_on_exact_commit_timestamp(t *testing.T
 
 func TestLog_time_travel_with_schema_changes_should_instantiate_old_schema(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs", "s3") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

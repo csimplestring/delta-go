@@ -109,7 +109,7 @@ func newScanTestFixtures() *scanTestFixture {
 
 func TestScan_properly_splits_metadata_pushed_and_data_residual_predicates(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs", "s3") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -140,7 +140,7 @@ func TestScan_properly_splits_metadata_pushed_and_data_residual_predicates(t *te
 
 func TestScan_filtered_scan_with_a_metadata_pushed_conjunct_should_return_matched_files(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs", "s3") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -181,7 +181,7 @@ func TestScan_filtered_scan_with_a_metadata_pushed_conjunct_should_return_matche
 }
 
 func TestScan_filtered_scan_with_only_data_residual_predicate_should_return_all_files(t *testing.T) {
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs", "s3") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -215,7 +215,7 @@ func TestScan_filtered_scan_with_only_data_residual_predicate_should_return_all_
 
 func TestScan_correct_reverse_replay(t *testing.T) {
 
-	for _, tt := range newTestLogCases("file", "azblob", "gs") {
+	for _, tt := range newTestLogCases("file", "azblob", "gs", "s3") {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
