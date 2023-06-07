@@ -20,8 +20,8 @@ What is it not?
 - [x] Local file system 
 - [x] Azure Blob Storage 
 - [x] Google Cloud Storage 
-- [X] AWS S3 (single cluster)
-- [ ] AWS S3 (multi clusters)
+- [X] AWS S3 (single driver)
+- [ ] AWS S3 (multi drivers)
 
 ## Usage Example
 
