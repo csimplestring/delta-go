@@ -34,6 +34,8 @@ func Relative(base string, path string) (string, error) {
 		return azureBlobRelative(base, path)
 	} else if p.Scheme == "gs" {
 		return gcsRelative(base, path)
+	} else if p.Scheme == "s3" {
+		return s3Relative(base, path)
 	}
 	return "", eris.New(fmt.Sprintf("unsupported scheme %s", p.Scheme))
 }
@@ -78,6 +80,10 @@ func gcsRelative(base string, path string) (string, error) {
 	return path, nil
 }
 
+func s3Relative(base string, path string) (string, error) {
+	return path, nil
+}
+
 func Canonicalize(path string, schema string) (string, error) {
 
 	if schema == "file" {
@@ -86,6 +92,8 @@ func Canonicalize(path string, schema string) (string, error) {
 		return azblobCanonicalize(path)
 	} else if schema == "gs" {
 		return gcsCanonicalize(path)
+	} else if schema == "s3" {
+		return s3Canonicalize(path)
 	}
 
 	return "", eris.Wrap(errno.UnsupportedFileSystem("unsupported schema to canonicalize"), schema)
@@ -110,5 +118,9 @@ func azblobCanonicalize(p string) (string, error) {
 }
 
 func gcsCanonicalize(p string) (string, error) {
+	return p, nil
+}
+
+func s3Canonicalize(p string) (string, error) {
 	return p, nil
 }

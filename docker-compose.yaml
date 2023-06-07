@@ -17,5 +17,19 @@ services:
       dockerfile: Dockerfile.gcs
     ports:
       - 4443:4443 
-    #command: bash -c "python init_gcs.py & gcp-storage-emulator start --host=localhost --port=9023 --in-memory --default-bucket=golden"
     command: sh -c "python init_gcs.py & /bin/fake-gcs-server -scheme http -public-host localhost:4443"
+
+  aws:
+    build:
+      context: ./
+      dockerfile: Dockerfile.aws
+    ports:
+      - "4566:4566" 
+    environment:
+      - SERVICES=s3
+      - DEBUG=0 
+      - START_WEB=0 
+      - LAMBDA_REMOTE_DOCKER=0
+      - DEFAULT_REGION=us-east-1
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
