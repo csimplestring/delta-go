@@ -1,0 +1,9 @@
+FROM localstack/localstack:latest
+
+# Copy init_azurite.py script
+COPY ./init_gcs.py init_gcs.py
+
+# Copy local blobs to azurite
+COPY ./tests /tmp/localstack/tests-data
+
+COPY ./init_s3.sh /etc/localstack/init/ready.d/init_s3.sh
