@@ -14,7 +14,10 @@ import (
 	_ "gocloud.dev/blob/s3blob"
 )
 
-func NewS3LogStore(logDir string) (*S3LogStore, error) {
+// Note: currently s3 log store only supports single driver.
+// TODO: support multi-drivers writes
+// see https://delta.io/blog/2022-05-18-multi-cluster-writes-to-delta-lake-storage-in-s3/
+func NewS3LogStore(logDir string) (*S3SingleDriverLogStore, error) {
 	// logDir is like: s3:///a/b/c/_delta_log/, must end with "/"
 	blobURL, err := path.ConvertToBlobURL(logDir)
 	if err != nil {
@@ -38,26 +41,26 @@ func NewS3LogStore(logDir string) (*S3LogStore, error) {
 		},
 	}
 
-	return &S3LogStore{
+	return &S3SingleDriverLogStore{
 		logDir: logDir,
 		s:      s,
 	}, nil
 }
 
-type S3LogStore struct {
+type S3SingleDriverLogStore struct {
 	logDir string
 	s      *baseStore
 	mu     sync.Mutex
 }
 
-func (a *S3LogStore) Root() string {
+func (a *S3SingleDriverLogStore) Root() string {
 	return ""
 }
 
 // Read the given file and return an `Iterator` of lines, with line breaks removed from
 // each line. Callers of this function are responsible to close the iterator if they are
 // done with it.
-func (a *S3LogStore) Read(path string) (iter.Iter[string], error) {
+func (a *S3SingleDriverLogStore) Read(path string) (iter.Iter[string], error) {
 	path, err := a.ResolvePathOnPhysicalStore(path)
 	if err != nil {
 		return nil, err
@@ -67,7 +70,7 @@ func (a *S3LogStore) Read(path string) (iter.Iter[string], error) {
 }
 
 // List the paths in the same directory that are lexicographically greater or equal to (UTF-8 sorting) the given `path`. The result should also be sorted by the file name.
-func (a *S3LogStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
+func (a *S3SingleDriverLogStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 	path, err := a.ResolvePathOnPhysicalStore(path)
 	if err != nil {
 		return nil, err
@@ -81,7 +84,7 @@ func (a *S3LogStore) ListFrom(path string) (iter.Iter[*FileMeta], error) {
 // exists and overwrite = false. Furthermore, if isPartialWriteVisible returns false,
 // implementation must ensure that the entire file is made visible atomically, that is,
 // it should not generate partial files.
-func (a *S3LogStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
+func (a *S3SingleDriverLogStore) Write(path string, actions iter.Iter[string], overwrite bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -104,19 +107,19 @@ func (a *S3LogStore) Write(path string, actions iter.Iter[string], overwrite boo
 }
 
 // Resolve the fully qualified path for the given `path`.
-func (a *S3LogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
+func (a *S3SingleDriverLogStore) ResolvePathOnPhysicalStore(path string) (string, error) {
 	return relativePath("s3", a.logDir, path)
 }
 
 // Whether a partial write is visible for the underlying file system of `path`.
-func (a *S3LogStore) IsPartialWriteVisible(path string) bool {
+func (a *S3SingleDriverLogStore) IsPartialWriteVisible(path string) bool {
 	return false
 }
 
-func (a *S3LogStore) Exists(path string) (bool, error) {
+func (a *S3SingleDriverLogStore) Exists(path string) (bool, error) {
 	return a.s.Exists(path)
 }
 
-func (a *S3LogStore) Create(path string) error {
+func (a *S3SingleDriverLogStore) Create(path string) error {
 	return a.s.Create(path)
 }
