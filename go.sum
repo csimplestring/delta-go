@@ -601,8 +601,8 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.18.3/go.mod h1:b+psTJn33Q4qGoDaM7ZiO
 github.com/aws/smithy-go v1.8.0/go.mod h1:SObp3lf9smib00L/v3U2eAKG8FyQ7iLrJnQiAmR5n+E=
 github.com/aws/smithy-go v1.13.5 h1:hgz0X/DX0dGqTYpGALqXJoRKRj5oQ7150i5FdTePzO8=
 github.com/aws/smithy-go v1.13.5/go.mod h1:Tg+OJXh4MB2R/uN61Ko2f6hTZwB/ZYGOtib8J3gBHzA=
-github.com/barweiss/go-tuple v1.0.2 h1:RFUKJf8BaALDgX4WIS1fgmAeEFLQo9h+n/QrbIQrdSo=
-github.com/barweiss/go-tuple v1.0.2/go.mod h1:oX3AtZyuGnCuK3B4PlUIfR9spxyJ42bgTSqCI9GkPB0=
+github.com/barweiss/go-tuple v1.1.1 h1:0dLwRqJHHpU9c5iJLF9Xjl5yEPDXwh5FhigydBoM5MM=
+github.com/barweiss/go-tuple v1.1.1/go.mod h1:oX3AtZyuGnCuK3B4PlUIfR9spxyJ42bgTSqCI9GkPB0=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
