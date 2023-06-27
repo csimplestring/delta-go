@@ -61,7 +61,7 @@ type IntegerType struct {
 }
 
 func (i *IntegerType) Name() string {
-	return "int"
+	return "integer"
 }
 
 type LongType struct {
