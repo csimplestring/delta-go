@@ -41,4 +41,18 @@ func TestLocalExample(t *testing.T) {
 	for _, f := range files {
 		log.Println(f.Path)
 	}
+
+	m, err := s.Metadata()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	schema, err := m.Schema()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, f := range schema.GetFields() {
+		log.Println(f)
+	}
 }
