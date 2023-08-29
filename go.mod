@@ -10,7 +10,7 @@ require (
 	github.com/barweiss/go-tuple v1.1.1
 	github.com/deckarep/golang-set/v2 v2.3.0
 	github.com/fraugster/parquet-go v0.12.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/repeale/fp-go v0.11.1
 	github.com/rotisserie/eris v0.5.4
