@@ -7,7 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.1.0
 	github.com/ahmetb/go-linq/v3 v3.2.0
-	github.com/barweiss/go-tuple v1.1.1
+	github.com/barweiss/go-tuple v1.1.2
 	github.com/deckarep/golang-set/v2 v2.3.0
 	github.com/fraugster/parquet-go v0.12.0
 	github.com/google/uuid v1.3.1
