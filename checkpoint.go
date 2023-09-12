@@ -164,8 +164,13 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 		}
 		defer iter.Close()
 
-		var checkpoints []*CheckpointInstance
-		for f, err := iter.Next(); err == nil; f, err = iter.Next() {
+		var (
+			checkpoints []*CheckpointInstance
+			iterErr     error
+			f           *store.FileMeta
+		)
+
+		for f, iterErr = iter.Next(); iterErr == nil; f, iterErr = iter.Next() {
 
 			if !filenames.IsCheckpointFile(f.Path()) {
 				continue
@@ -177,8 +182,9 @@ func FindLastCompleteCheckpoint(s store.Store, cv CheckpointInstance) (mo.Option
 				break
 			}
 		}
-		if err != nil && err != io.EOF {
-			return mo.None[*CheckpointInstance](), eris.Wrap(err, "")
+
+		if iterErr != nil && iterErr != io.EOF {
+			return mo.None[*CheckpointInstance](), eris.Wrap(iterErr, "")
 		}
 
 		lastCheckpoint := GetLatestCompleteCheckpointFromList(checkpoints, cv)
