@@ -73,8 +73,8 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.21.1 h1:pAOJj+80tC8sPVgSDHzMYD6KLWsa
 github.com/aws/aws-sdk-go-v2/service/sts v1.21.1/go.mod h1:G8SbvL0rFk4WOJroU8tKBczhsbhj2p/YY7qeJezJ3CI=
 github.com/aws/smithy-go v1.14.0 h1:+X90sB94fizKjDmwb4vyl2cTTPXTE5E2G/1mjByb0io=
 github.com/aws/smithy-go v1.14.0/go.mod h1:Tg+OJXh4MB2R/uN61Ko2f6hTZwB/ZYGOtib8J3gBHzA=
-github.com/barweiss/go-tuple v1.1.1 h1:0dLwRqJHHpU9c5iJLF9Xjl5yEPDXwh5FhigydBoM5MM=
-github.com/barweiss/go-tuple v1.1.1/go.mod h1:oX3AtZyuGnCuK3B4PlUIfR9spxyJ42bgTSqCI9GkPB0=
+github.com/barweiss/go-tuple v1.1.2 h1:ul9tIW0LZ5w+Vk/Hi3X9z3JyqkD0yaVGZp+nNTLW2YE=
+github.com/barweiss/go-tuple v1.1.2/go.mod h1:SpoVilkI7ycNrIkQxcQfS1JG5A+R40sWwEUlPONlp3k=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
