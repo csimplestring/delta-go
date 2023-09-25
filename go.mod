@@ -14,7 +14,7 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/repeale/fp-go v0.11.1
 	github.com/rotisserie/eris v0.5.4
-	github.com/samber/mo v1.8.0
+	github.com/samber/mo v1.10.0
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.4
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6
