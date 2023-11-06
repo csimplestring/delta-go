@@ -5,7 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/storage v1.31.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.1.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/barweiss/go-tuple v1.1.1
 	github.com/deckarep/golang-set/v2 v2.3.1
