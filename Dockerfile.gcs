@@ -2,8 +2,7 @@ FROM fsouza/fake-gcs-server
 
 RUN apk update && \
     apk --no-cache add py3-pip && \
-    apk add --virtual=build gcc libffi-dev musl-dev python3-dev && \
-    pip3 install --upgrade pip 
+    apk add --virtual=build gcc libffi-dev musl-dev python3-dev 
 
 RUN python3 -m venv .venv && \
     source .venv/bin/activate && \
