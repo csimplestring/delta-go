@@ -12,6 +12,6 @@ RUN python3 -m venv .venv && \
 COPY ./init_gcs.py init_gcs.py
 
 # Copy local blobs to azurite
-COPY ./tests /docker-entrypoint-init-storage
+COPY ./tests /data
 
 ENTRYPOINT []
