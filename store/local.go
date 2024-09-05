@@ -100,7 +100,11 @@ func (l *LocalStore) IsPartialWriteVisible(path string) bool {
 }
 
 func (l *LocalStore) Exists(path string) (bool, error) {
-	return l.s.Exists(path)
+	_, err := l.ResolvePathOnPhysicalStore(path)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (l *LocalStore) Create(path string) error {

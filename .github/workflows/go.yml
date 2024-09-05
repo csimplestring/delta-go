@@ -25,7 +25,7 @@ jobs:
       run: go build -v ./...
 
     - name: Set up testing stacks
-      run: docker-compose up -d
+      run: docker compose up -d
 
     - name: Test
       run: go test -v ./...
